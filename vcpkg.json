@@ -1,0 +1,21 @@
+{
+  "name": "wumbo",
+  "version-semver": "0.1.0",
+  "dependencies": [
+    "pegtl",
+    "cli11"
+  ],
+  "default-features": [],
+  "features": {
+    "test": {
+      "description": "Dependencies for testing",
+      "dependencies": [
+        {
+          "name": "catch2",
+          "version>=": "3.3.1"
+        }
+      ]
+    }
+  },
+  "builtin-baseline": "9edb1b8e590cc086563301d735cae4b6e732d2d2"
+}
