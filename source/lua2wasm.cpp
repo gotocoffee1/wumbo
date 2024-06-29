@@ -292,7 +292,12 @@ struct compiler
 
     void build_types()
     {
-        BinaryenModuleSetFeatures(mod, BinaryenFeatureGC() | BinaryenModuleGetFeatures(mod));
+        BinaryenModuleSetFeatures(
+            mod,
+            BinaryenModuleGetFeatures(mod)
+                | BinaryenFeatureGC()
+                | BinaryenFeatureBulkMemory()
+                | BinaryenFeatureReferenceTypes());
 
         struct struct_def
         {
@@ -300,6 +305,7 @@ struct compiler
             std::vector<BinaryenType> field_types;
             std::vector<BinaryenPackedType> field_packs;
             std::vector<uint8_t> field_mut; // classic c++
+            bool is_array = false;
         };
 
         struct_def defs[] = {
@@ -329,9 +335,10 @@ struct compiler
             },
             {
                 "string",
-                {BinaryenTypeArrayref()},
-                {BinaryenPackedTypeNotPacked()},
+                {BinaryenTypeInt32()},
+                {BinaryenPackedTypeInt8()},
                 {false},
+                true,
             },
             {
                 "function",
@@ -363,13 +370,21 @@ struct compiler
         for (size_t i = 0; i < std::size(defs); ++i)
         {
             auto& def = defs[i];
-            TypeBuilderSetStructType(
-                tb,
-                i,
-                def.field_types.data(),
-                def.field_packs.data(),
-                reinterpret_cast<bool*>(def.field_mut.data()),
-                def.field_types.size());
+            if (def.is_array)
+                TypeBuilderSetArrayType(
+                    tb,
+                    i,
+                    def.field_types[0],
+                    def.field_packs[0],
+                    def.field_mut[0]);
+            else
+                TypeBuilderSetStructType(
+                    tb,
+                    i,
+                    def.field_types.data(),
+                    def.field_packs.data(),
+                    reinterpret_cast<bool*>(def.field_mut.data()),
+                    def.field_types.size());
         }
 
         BinaryenHeapType heap_types[std::size(defs)];
@@ -404,11 +419,16 @@ struct compiler
 
         std::visit(overload{
                        [](const name_t& name) {
+
                        },
                        [](const expression& expr) {
                        },
                    },
                    p.head);
+        for (auto& [vartails, functail] : p.tail)
+        {
+        }
+
         return result;
     }
     auto operator()(const label_statement& p)
@@ -546,10 +566,11 @@ struct compiler
     auto operator()(const literal& p)
     {
         static int i = 0;
-        BinaryenAddDataSegment(mod, std::to_string(i++).c_str(), "", true, 0, p.str.data(), p.str.size());
+        auto name    = std::to_string(i++);
 
-        //return BinaryenStructNew(mod, 0, 0, BinaryenTypeGetHeapType(i32Struct));
-        return BinaryenUnreachable(mod);
+        BinaryenAddDataSegment(mod, name.c_str(), "", true, 0, p.str.data(), p.str.size());
+
+        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_types::string>()), name.c_str(), BinaryenConst(mod, BinaryenLiteralInt32(0)), BinaryenConst(mod, BinaryenLiteralInt32(p.str.size())));
     }
 
     auto operator()(const ellipsis& p)
@@ -566,9 +587,9 @@ struct compiler
 
         BinaryenExpressionRef body = (*this)(inner);
 
-        std::vector<BinaryenType> vars(count_locals{}(inner), BinaryenTypeStructref());
-        std::vector<BinaryenType> params(p.size(), BinaryenTypeStructref());
-        std::vector<BinaryenType> returns(max_returns{}(inner), BinaryenTypeStructref());
+        std::vector<BinaryenType> vars(count_locals{}(inner), BinaryenTypeAnyref());
+        std::vector<BinaryenType> params(p.size(), BinaryenTypeAnyref());
+        std::vector<BinaryenType> returns(max_returns{}(inner), BinaryenTypeAnyref());
 
         env.pop_back();
         return BinaryenAddFunction(mod, name, BinaryenTypeCreate(params.data(), params.size()), BinaryenTypeCreate(returns.data(), returns.size()), vars.data(), vars.size(), body);
@@ -675,11 +696,17 @@ struct compiler
         {
             auto list = (*this)(*p.retstat);
 
-            for (auto& l : list)
-                l = new_number(l);
-
-            auto ret = BinaryenTupleMake(mod, list.data(), list.size());
-            result.push_back(BinaryenReturn(mod, ret));
+            //for (auto& l : list)
+            //    l = new_number(l);
+            if (list.empty())
+                result.push_back(BinaryenReturn(mod, nullptr));
+            else if (list.size() == 1)
+                result.push_back(BinaryenReturn(mod, list[0]));
+            else
+            {
+                auto ret = BinaryenTupleMake(mod, list.data(), list.size());
+                result.push_back(BinaryenReturn(mod, ret));
+            }
         }
 
         env.back().pop_back();
@@ -697,6 +724,7 @@ wasm::mod compile(const block& chunk)
     auto start = c.add_func("start", chunk, {}, true);
     //BinaryenSetStart(mod, v);
     BinaryenAddFunctionExport(mod, "start", "start");
+    BinaryenModuleValidate(mod);
     //BinaryenModuleInterpret(mod);
     //BinaryenModuleOptimize(mod);
     //BinaryenModuleSetTypeName(mod, builtHeapTypes[0], "SomeStruct");
