@@ -142,14 +142,7 @@ struct expr_temp
     std::optional<un_operator> u_op;
 };
 
-struct args
-{
-    std::variant<
-        expression_list, // size >=0
-        table_constructor,
-        literal>
-        inner;
-};
+using args = expression_list;  // size >=0
 
 //   vartail ::= '[' exp ']' | '.' Name
 using vartail = std::variant<expression, name_t>;

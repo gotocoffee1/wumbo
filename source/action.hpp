@@ -135,7 +135,7 @@ struct action<literal_string> : fill_expression<ast::literal>
     template<typename ParseInput>
     static void success(const ParseInput&, ast::literal& c, ast::args& p)
     {
-        p.inner.emplace<ast::literal>(std::move(c));
+        p.emplace_back().inner.emplace<ast::literal>(std::move(c));
     }
     using fill_expression::success;
 };
@@ -424,7 +424,7 @@ struct action<expr_list_must> : change_states<ast::expression_list>
     template<typename ParseInput>
     static void success(const ParseInput&, ast::expression_list& c, ast::args& p)
     {
-        p.inner.emplace<ast::expression_list>(std::move(c));
+        p = std::move(c);
     }
 };
 
@@ -759,7 +759,7 @@ struct action<table_constructor> : fill_expression<ast::table_constructor>
     template<typename ParseInput>
     static void success(const ParseInput&, ast::table_constructor& c, ast::args& p)
     {
-        p.inner.emplace<ast::table_constructor>(std::move(c));
+        p.emplace_back().inner.emplace<ast::table_constructor>(std::move(c));
     }
 
     using fill_expression::success;

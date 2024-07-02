@@ -284,6 +284,19 @@ struct compiler
         return i;
     }
 
+    size_t find(const std::string& var_name)
+    {
+        for (auto func = env.rbegin(); func != env.rend(); ++func)
+            for (auto it = func->rbegin(); it != func->rend(); ++it)
+            {
+                if (auto local = std::find(it->rbegin(), it->rend(), var_name); local != it->rend())
+                {
+                    return std::distance(it->begin(), std::next(local).base());
+                }
+            }
+        return 0;
+    }
+
     template<value_types T>
     BinaryenType type() const
     {
@@ -348,19 +361,19 @@ struct compiler
             },
             {
                 "userdata",
-                {BinaryenTypeFuncref()},
+                {BinaryenTypeFloat32()},
                 {BinaryenPackedTypeNotPacked()},
                 {false},
             },
             {
                 "thread",
-                {BinaryenTypeFuncref()},
+                {BinaryenTypeFloat32()},
                 {BinaryenPackedTypeNotPacked()},
                 {false},
             },
             {
                 "table",
-                {BinaryenTypeFuncref()},
+                {BinaryenTypeFloat32()},
                 {BinaryenPackedTypeNotPacked()},
                 {false},
             },
@@ -407,6 +420,24 @@ struct compiler
         return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::number>()));
     }
 
+    BinaryenExpressionRef new_integer(BinaryenExpressionRef num)
+    {
+        return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::integer>()));
+    }
+
+    BinaryenExpressionRef new_value(BinaryenExpressionRef exp)
+    {
+        auto type = BinaryenExpressionGetType(exp);
+        if (type == BinaryenTypeFloat64())
+            return new_number(exp);
+        else if (type == BinaryenTypeInt64())
+            return new_integer(exp);
+        else
+        {
+            return exp;
+        }
+    }
+
     auto operator()(const assignments& p)
     {
         (*this)(p.explist);
@@ -416,17 +447,22 @@ struct compiler
     auto operator()(const function_call& p)
     {
         std::vector<BinaryenExpressionRef> result;
-
+       size_t local_index;
         std::visit(overload{
-                       [](const name_t& name) {
-
+                       [&](const name_t& name)
+                       {
+                           local_index = find(name);
                        },
                        [](const expression& expr) {
                        },
                    },
                    p.head);
+       
         for (auto& [vartails, functail] : p.tail)
         {
+            auto args = (*this)(functail.args);
+            result.push_back(BinaryenDrop(mod, BinaryenLocalGet(mod, local_index, type<value_types::function>())));
+            //BinaryenCallRef(mod, , args.data(), args.size(), BinaryenTypeAuto(), false);
         }
 
         return result;
@@ -475,23 +511,17 @@ struct compiler
         std::vector<BinaryenExpressionRef> result;
         return result;
     }
-    auto operator()(const function_definition& p)
+    auto operator()(const function_definition& p) -> std::vector<BinaryenExpressionRef>
     {
-        add_func(p.function_name.back().c_str(), p.body.inner, p.body.params, p.body.vararg);
-        std::vector<BinaryenExpressionRef> result;
-        return result;
+        return {add_func_ref(p.function_name.back().c_str(), p.body)};
     }
-    auto operator()(const local_function& p)
+    auto operator()(const local_function& p) -> std::vector<BinaryenExpressionRef>
     {
         size_t offset = local_offset();
 
         env.back().back().emplace_back(p.name);
 
-        std::vector<BinaryenExpressionRef> result;
-        add_func(p.name.c_str(), p.body.inner, p.body.params, p.body.vararg);
-
-        //exp = BinaryenLocalSet(mod, offset + 0, exp);
-        return result;
+        return {BinaryenLocalSet(mod, offset + 0, add_func_ref(p.name.c_str(), p.body))};
     }
     auto operator()(const local_variables& p)
     {
@@ -507,7 +537,7 @@ struct compiler
         for (auto min = std::min(p.names.size(), explist.size()); i < min; ++i)
         {
             scope.emplace_back(p.names[i]);
-            auto exp = new_number(explist[i]);
+            auto exp = new_value(explist[i]);
             exp      = BinaryenLocalSet(mod, offset + i, exp);
             result.push_back(exp);
         }
@@ -595,10 +625,17 @@ struct compiler
         return BinaryenAddFunction(mod, name, BinaryenTypeCreate(params.data(), params.size()), BinaryenTypeCreate(returns.data(), returns.size()), vars.data(), vars.size(), body);
     }
 
+    auto add_func_ref(const char* name, const function_body& p) -> BinaryenExpressionRef
+    {
+        auto func = add_func(name, p.inner, p.params, p.vararg);
+
+        BinaryenExpressionRef exp = BinaryenRefFunc(mod, name, BinaryenTypeFuncref());
+        return BinaryenStructNew(mod, &exp, 1, BinaryenTypeGetHeapType(type<value_types::function>()));
+    }
+
     auto operator()(const function_body& p)
     {
-        auto func = add_func("a", p.inner, p.params, p.vararg);
-        return BinaryenUnreachable(mod);
+        return add_func_ref("tja", p);
     }
 
     auto operator()(const box<prefixexp>& p)
@@ -671,7 +708,6 @@ struct compiler
         }
 
         result = BinaryenBinary(mod, op, lhs, rhs);
-
         return result;
     }
 
@@ -696,8 +732,8 @@ struct compiler
         {
             auto list = (*this)(*p.retstat);
 
-            //for (auto& l : list)
-            //    l = new_number(l);
+            for (auto& l : list)
+                l = new_value(l);
             if (list.empty())
                 result.push_back(BinaryenReturn(mod, nullptr));
             else if (list.size() == 1)
