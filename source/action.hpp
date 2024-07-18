@@ -181,9 +181,9 @@ struct action<name>
     }
 
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::name_t& name, ast::field::index_t& p)
+    static void success(const ParseInput&, ast::name_t& name, std::pair<ast::name_t, ast::expression>& p)
     {
-        p.emplace<ast::name_t>(std::move(name));
+        p.first = std::move(name);
     }
 
     template<typename ParseInput>
@@ -456,9 +456,18 @@ struct action<expression> : change_states<ast::expression>
     }
 
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::expression& c, ast::field::index_t& p)
+    static void success(const ParseInput&, ast::expression& c, std::pair<ast::name_t, ast::expression>& p)
     {
-        p.emplace<ast::expression>(std::move(c));
+        p.second = std::move(c);
+    }
+
+    template<typename ParseInput>
+    static void success(const ParseInput&, ast::expression& c, std::pair<std::optional<ast::expression>, ast::expression>& p)
+    {
+        if (p.first)
+            p.second = std::move(c);
+        else
+            p.first = std::move(c);
     }
 
     template<typename ParseInput>
@@ -724,22 +733,24 @@ struct action<for_statement> : change_states<ast::for_combined>
 };
 
 template<>
-struct action<table_field_two> : change_states<ast::field::index_t>
+struct action<table_field_two> : change_states<std::pair<ast::name_t, ast::expression>>
 {
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::field::index_t& c, ast::field& p)
+    static void success(const ParseInput&, std::pair<ast::name_t, ast::expression>& c, ast::field& p)
     {
-        p.index = std::move(c);
+        p.index = std::move(c.first);
+        p.value = std::move(c.second);
     }
 };
 
 template<>
-struct action<table_field_one> : change_states<ast::field::index_t>
+struct action<table_field_one> : change_states<std::pair<std::optional<ast::expression>, ast::expression>>
 {
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::field::index_t& c, ast::field& p)
+    static void success(const ParseInput&, std::pair<std::optional<ast::expression>, ast::expression>& c, ast::field& p)
     {
-        p.index = std::move(c);
+        p.index = std::move(*c.first);
+        p.value = std::move(c.second);
     }
 };
 

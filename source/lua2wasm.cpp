@@ -277,6 +277,9 @@ struct compiler
     std::vector<size_t> blocks;
     std::vector<size_t> functions;
 
+    size_t function_name = 0;
+    size_t data_name     = 0;
+
     size_t local_offset() const
     {
         return vars.size() - functions.back();
@@ -288,22 +291,13 @@ struct compiler
         {
             return std::distance(vars.begin(), std::next(local).base()) - functions.back();
         }
-
-        //for (auto func = env.rbegin(); func != env.rend(); ++func)
-        //    for (auto it = func->rbegin(); it != func->rend(); ++it)
-        //    {
-        //        if (auto local = std::find(it->rbegin(), it->rend(), var_name); local != it->rend())
-        //        {
-        //            return std::distance(it->begin(), std::next(local).base());
-        //        }
-        //    }
         return 0;
     }
 
     template<value_types T>
     BinaryenType type() const
     {
-        return types[static_cast<std::underlying_type_t<value_types>>(T) + 1];
+        return types[static_cast<std::underlying_type_t<value_types>>(T) + 2];
     }
 
     BinaryenType ref_array_type() const
@@ -314,6 +308,11 @@ struct compiler
     BinaryenType lua_func() const
     {
         return types[1];
+    }
+
+    BinaryenType pair_list() const
+    {
+        return types[2];
     }
 
     void build_types()
@@ -358,6 +357,11 @@ struct compiler
             bool nullable = true;
         };
 
+        BinaryenType pair[] = {
+            BinaryenTypeAnyref(),
+            BinaryenTypeAnyref(),
+        };
+
         def defs[] = {
             {
                 "ref_array",
@@ -372,6 +376,14 @@ struct compiler
                 sig_def{
                     {},
                     {},
+                },
+            },
+            {
+                "pair_list",
+                array_def{
+                    BinaryenTypeCreate(std::data(pair), std::size(pair)),
+                    BinaryenPackedTypeNotPacked(),
+                    false,
                 },
             },
             {
@@ -426,15 +438,15 @@ struct compiler
             {
                 "thread",
                 struct_def{
-                    {BinaryenTypeFloat32()},
-                    {BinaryenPackedTypeNotPacked()},
-                    {false},
+                    {BinaryenTypeFloat32(), BinaryenTypeFloat32()},
+                    {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
+                    {false, false},
                 },
             },
             {
                 "table",
                 struct_def{
-                    {BinaryenTypeFloat32()},
+                    {BinaryenTypeNone()},
                     {BinaryenPackedTypeNotPacked()},
                     {false},
                 },
@@ -450,8 +462,11 @@ struct compiler
 
         BinaryenType lua_function = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 1), true);
 
-        std::get<struct_def>(defs[6].inner).field_types[0] = lua_function;
-        std::get<struct_def>(defs[6].inner).field_types[1] = ref_array;
+        std::get<struct_def>(defs[7].inner).field_types[0] = lua_function;
+        std::get<struct_def>(defs[7].inner).field_types[1] = ref_array;
+
+        std::get<struct_def>(defs[10].inner).field_types[0] = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
+        //std::get<struct_def>(defs[10].inner).field_types[0] = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 2), true);
 
         for (size_t i = 0; i < std::size(defs); ++i)
         {
@@ -492,7 +507,7 @@ struct compiler
         TypeBuilderErrorReason error_reason;
         if (!TypeBuilderBuildAndDispose(tb, (BinaryenHeapType*)&heap_types, &error_index, &error_reason))
         {
-            // error
+            throw;
         }
         for (size_t i = 0; i < std::size(defs); ++i)
         {
@@ -547,16 +562,18 @@ struct compiler
                    p.head);
         for (auto& [vartails, functail] : p.tail)
         {
-            auto args = (*this)(functail.args);
-            auto exp  = BinaryenLocalGet(mod, local_index, BinaryenTypeAnyref());
-            exp       = BinaryenRefCast(mod, exp, type<value_types::function>());
-            exp       = BinaryenStructGet(mod, 0, exp, BinaryenTypeFuncref(), false);
-            //exp       = BinaryenRefCast(mod, exp, lua_func());
+            auto args     = (*this)(functail.args);
+            auto exp      = BinaryenLocalGet(mod, local_index, BinaryenTypeAnyref());
+            exp           = BinaryenRefCast(mod, exp, type<value_types::function>());
+            auto func_ref = BinaryenStructGet(mod, 0, exp, BinaryenTypeFuncref(), false);
+            auto upvalues = BinaryenStructGet(mod, 1, exp, ref_array_type(), false);
 
-            //auto exp       = BinaryenRefFunc(mod, "tja", BinaryenTypeFromHeapType(BinaryenFunctionGetType(func), false));
-            //BinaryenExpressionPrint(exp);
-            //exp = BinaryenUnreachable(mod);
-            exp = BinaryenCallRef(mod, exp, args.data(), args.size(), BinaryenTypeNone(), false);
+            BinaryenExpressionRef real_args[] = {
+                BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), args.data(), args.size()),
+                upvalues,
+            };
+
+            exp = BinaryenDrop(mod, BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false));
             result.push_back(exp);
         }
         return result;
@@ -685,14 +702,16 @@ struct compiler
         return BinaryenConst(mod, BinaryenLiteralFloat64(p));
     }
 
+    auto add_string(const std::string& str)
+    {
+        auto name = std::to_string(data_name++);
+        BinaryenAddDataSegment(mod, name.c_str(), "", true, 0, str.data(), str.size());
+        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_types::string>()), name.c_str(), BinaryenConst(mod, BinaryenLiteralInt32(0)), BinaryenConst(mod, BinaryenLiteralInt32(str.size())));
+    }
+
     auto operator()(const literal& p)
     {
-        static int i = 0;
-        auto name    = std::to_string(i++);
-
-        BinaryenAddDataSegment(mod, name.c_str(), "", true, 0, p.str.data(), p.str.size());
-
-        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_types::string>()), name.c_str(), BinaryenConst(mod, BinaryenLiteralInt32(0)), BinaryenConst(mod, BinaryenLiteralInt32(p.str.size())));
+        return add_string(p.str);
     }
 
     auto operator()(const ellipsis& p)
@@ -706,19 +725,34 @@ struct compiler
 
         //for (auto& name : p)
         //    scope.emplace_back(name);
-        vars.emplace_back("locals");
-        vars.emplace_back("upvalues");
+        vars.emplace_back(""); // args
+        vars.emplace_back(""); // upvalues
 
-        BinaryenExpressionRef body = (*this)(inner);
+        auto body = (*this)(inner);
+
+        body.push_back(BinaryenReturn(mod, BinaryenRefNull(mod, BinaryenTypeNullref())));
 
         std::vector<BinaryenType> locals(count_locals{}(inner), BinaryenTypeAnyref());
         //std::vector<BinaryenType> params(p.size(), BinaryenTypeAnyref());
         //std::vector<BinaryenType> returns(max_returns{}(inner), BinaryenTypeAnyref());
 
+        auto result = BinaryenAddFunctionWithHeapType(mod,
+                                                      name,
+                                                      BinaryenTypeGetHeapType(lua_func()),
+                                                      locals.data(),
+                                                      locals.size(),
+                                                      BinaryenBlock(mod, nullptr, body.data(), body.size(), BinaryenTypeAuto()));
+
+        BinaryenFunctionSetLocalName(result, 0, "args");
+        BinaryenFunctionSetLocalName(result, 1, "upvalues");
+
+        //for (size_t i = functions.back() + 2; i < vars.size(); ++i)
+        //    BinaryenFunctionSetLocalName(result, i - functions.back(), vars[i].c_str());
+
         vars.resize(functions.back());
         functions.pop_back();
 
-        return BinaryenAddFunctionWithHeapType(mod, name, BinaryenTypeGetHeapType(lua_func()), locals.data(), locals.size(), body);
+        return result;
     }
 
     auto add_func_ref(const char* name, const function_body& p) -> BinaryenExpressionRef
@@ -732,7 +766,7 @@ struct compiler
 
     auto operator()(const function_body& p)
     {
-        return add_func_ref("tja", p);
+        return add_func_ref(std::to_string(function_name++).c_str(), p);
     }
 
     auto operator()(const box<prefixexp>& p)
@@ -741,7 +775,33 @@ struct compiler
     }
     auto operator()(const table_constructor& p)
     {
-        return BinaryenUnreachable(mod);
+        std::vector<BinaryenExpressionRef> exp;
+        for (auto& field : p)
+        {
+            std::visit(overload{
+                           [&](const std::monostate&)
+                           {
+                               exp.push_back(new_value((*this)(field.value)));
+                           },
+                           [&](const expression& index)
+                           {
+                               exp.push_back(new_value((*this)(index)));
+                               exp.push_back(new_value((*this)(field.value)));
+                           },
+                           [&](const name_t& name)
+                           {
+                               exp.push_back(add_string(name));
+                               exp.push_back(new_value((*this)(field.value)));
+                           },
+                       },
+                       field.index);
+        }
+
+        BinaryenExpressionRef table_init[] = {
+
+            BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(exp), std::size(exp)),
+        };
+        return BinaryenStructNew(mod, std::data(table_init), std::size(table_init), BinaryenTypeGetHeapType(type<value_types::table>()));
     }
     auto operator()(const box<bin_operation>& p)
     {
@@ -816,7 +876,7 @@ struct compiler
         return rhs;
     }
 
-    BinaryenExpressionRef operator()(const block& p)
+    auto operator()(const block& p) -> std::vector<BinaryenExpressionRef>
     {
         blocks.push_back(vars.size());
 
@@ -843,12 +903,9 @@ struct compiler
             }
         }
 
-        result.push_back(BinaryenReturn(mod, BinaryenRefNull(mod, BinaryenTypeNullref())));
-
         vars.resize(blocks.back());
         blocks.pop_back();
-
-        return BinaryenBlock(mod, nullptr, result.data(), result.size(), BinaryenTypeAuto());
+        return result;
     }
 };
 

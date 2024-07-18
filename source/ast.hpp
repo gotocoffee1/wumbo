@@ -142,7 +142,7 @@ struct expr_temp
     std::optional<un_operator> u_op;
 };
 
-using args = expression_list;  // size >=0
+using args = expression_list; // size >=0
 
 //   vartail ::= '[' exp ']' | '.' Name
 using vartail = std::variant<expression, name_t>;
@@ -279,6 +279,7 @@ struct statement
 };
 } // namespace ast
 
+#include "util.hpp"
 #include <ostream>
 #include <string_view>
 
@@ -314,15 +315,121 @@ struct printer
         return guard{*this};
     }
 
+    void _functail(const functail& f)
+    {
+        (*this)(f.args);
+        //(*this)(f.name);
+    }
+
+    void _vartail(const vartail& v)
+    {
+        std::visit(overload{
+                       [&](const expression& exp)
+                       {
+                           (*this)(exp);
+                       },
+                       [&](const name_t& name)
+                       {
+                           print(name);
+                       },
+                   },
+                   v);
+    }
+
+    void _varhead(const varhead& v)
+    {
+        std::visit(overload{
+                       [&](const std::pair<expression, vartail>& exp)
+                       {
+                           (*this)(exp.first);
+                           _vartail(exp.second);
+                       },
+                       [&](const name_t& name)
+                       {
+                           print(name);
+                       },
+                   },
+                   v);
+    }
+
+    void _funchead(const funchead& v)
+    {
+        std::visit(overload{
+                       [&](const expression& exp)
+                       {
+                           (*this)(exp);
+                       },
+                       [&](const name_t& name)
+                       {
+                           print(name);
+                       },
+                   },
+                   v);
+    }
+
     void operator()(const assignments& p)
     {
         auto g = print_indent("assignments");
+        for (auto& var : p.varlist)
+        {
+            _varhead(var.head);
+            for (auto& [func, var] : var.tail)
+            {
+                for (auto& f : func)
+                    _functail(f);
+                _vartail(var);
+            }
+        }
+
         (*this)(p.explist);
     }
+
     void operator()(const function_call& p)
     {
         auto g = print_indent("function_call");
+
+        _funchead(p.head);
+
+        for (auto& [var, func] : p.tail)
+        {
+            for (auto& v : var)
+                _vartail(v);
+            _functail(func);
+        }
     }
+
+    void operator()(const prefixexp& p)
+    {
+        auto g = print_indent("prefixexp");
+
+        std::visit(overload{
+                       [&](const expression& exp)
+                       {
+                           (*this)(exp);
+                       },
+                       [&](const name_t& name)
+                       {
+                           print(name);
+                       },
+                   },
+                   p.chead);
+
+        for (auto& t : p.tail)
+        {
+            std::visit(overload{
+                           [&](const functail& f)
+                           {
+                               _functail(f);
+                           },
+                           [&](const vartail& v)
+                           {
+                               _vartail(v);
+                           },
+                       },
+                       t);
+        }
+    }
+
     void operator()(const label_statement& p)
     {
         print("label_statement");
@@ -372,6 +479,8 @@ struct printer
     void operator()(const local_variables& p)
     {
         auto g = print_indent("local_variables");
+        (*this)(p.names);
+        (*this)(p.explist);
     }
 
     void operator()(const expression& p)
@@ -420,24 +529,47 @@ struct printer
 
         (*this)(p.inner);
     }
-    void operator()(const box<prefixexp>& p)
-    {
-        auto g = print_indent("prefixexp");
-    }
+
     void operator()(const table_constructor& p)
     {
         auto g = print_indent("table_constructor");
+        for (auto& field : p)
+        {
+            auto g = print_indent("field");
+            std::visit(overload{
+                           [](const std::monostate&)
+                           {
+                               // array
+                           },
+                           [&](const expression& exp)
+                           {
+                               (*this)(exp);
+                           },
+                           [&](const name_t& name)
+                           {
+                               print(name);
+                           },
+                       },
+                       field.index);
+            (*this)(field.value);
+        }
     }
-    void operator()(const box<bin_operation>& p)
+    void operator()(const bin_operation& p)
     {
         auto g = print_indent("bin_operation");
-        (*this)(p->lhs);
-        (*this)(p->rhs);
+        (*this)(p.lhs);
+        (*this)(p.rhs);
     }
-    void operator()(const box<un_operation>& p)
+    void operator()(const un_operation& p)
     {
         auto g = print_indent("un_operation");
-        (*this)(p->rhs);
+        (*this)(p.rhs);
+    }
+
+    template<typename T>
+    void operator()(const box<T>& p)
+    {
+        (*this)(*p);
     }
 
     void operator()(const name_list& p)
