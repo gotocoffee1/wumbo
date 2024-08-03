@@ -176,7 +176,7 @@ struct var
 struct prefixexp
 {
     //   chead ::= '(' exp ')' | Name
-    std::variant<expression, name_t> chead;
+    std::variant<name_t, expression> chead;
     //   combined ::= chead { functail | vartail }
     std::vector<std::variant<functail, vartail>> tail;
 };
@@ -402,17 +402,7 @@ struct printer
     {
         auto g = print_indent("prefixexp");
 
-        std::visit(overload{
-                       [&](const expression& exp)
-                       {
-                           (*this)(exp);
-                       },
-                       [&](const name_t& name)
-                       {
-                           print(name);
-                       },
-                   },
-                   p.chead);
+        _funchead(p.chead);
 
         for (auto& t : p.tail)
         {
