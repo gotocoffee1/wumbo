@@ -12,7 +12,6 @@ namespace lua2wasm
 using namespace ast;
 using namespace wasm;
 
-
 enum class var_type
 {
     local,
@@ -263,7 +262,6 @@ struct max_returns
 
 struct compiler : utils
 {
-
     std::vector<std::string> vars;
     std::vector<size_t> blocks;
     std::vector<size_t> functions;
@@ -301,14 +299,9 @@ struct compiler : utils
         return {var_type::global, 0}; // global
     }
 
-
-
-   
-
-
     BinaryenExpressionRef get_upvalue(size_t index)
     {
-        auto exp = BinaryenLocalGet(mod, 1, ref_array_type());
+        auto exp = BinaryenLocalGet(mod, upvalue_index, ref_array_type());
         exp      = BinaryenArrayGet(mod, exp, const_i32(upvalues.back().size()), BinaryenTypeAnyref(), false);
         upvalues.back().push_back(index);
         return exp;
@@ -324,7 +317,7 @@ struct compiler : utils
         case var_type::upvalue:
             return get_upvalue(index);
         case var_type::global:
-            return BinaryenUnreachable(mod);
+            return null();
         default:
             return BinaryenUnreachable(mod);
         }
@@ -353,8 +346,8 @@ struct compiler : utils
         auto upvalues = BinaryenStructGet(mod, 1, exp, ref_array_type(), false);
 
         BinaryenExpressionRef real_args[] = {
-            BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), args.data(), args.size()),
             upvalues,
+            BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), args.data(), args.size()),
         };
 
         exp = BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false);
@@ -561,14 +554,20 @@ struct compiler : utils
 
         //for (auto& name : p)
         //    scope.emplace_back(name);
-        vars.emplace_back(""); // args
         vars.emplace_back(""); // upvalues
+        vars.emplace_back(""); // args
+        for (auto& arg : p)
+        {
+            vars.emplace_back(arg);
+        }
 
+
+        //BinaryenLocalGet(mod)
         auto body = (*this)(inner);
 
         body.push_back(BinaryenReturn(mod, null()));
 
-        std::vector<BinaryenType> locals(count_locals{}(inner), BinaryenTypeAnyref());
+        std::vector<BinaryenType> locals(count_locals{}(inner) + p.size(), BinaryenTypeAnyref());
         //std::vector<BinaryenType> params(p.size(), BinaryenTypeAnyref());
         //std::vector<BinaryenType> returns(max_returns{}(inner), BinaryenTypeAnyref());
 
@@ -579,8 +578,14 @@ struct compiler : utils
                                                       locals.size(),
                                                       BinaryenBlock(mod, nullptr, body.data(), body.size(), BinaryenTypeAuto()));
 
-        BinaryenFunctionSetLocalName(result, 0, "args");
-        BinaryenFunctionSetLocalName(result, 1, "upvalues");
+        BinaryenFunctionSetLocalName(result, args_index, "args");
+        BinaryenFunctionSetLocalName(result, upvalue_index, "upvalues");
+
+        size_t i = 2;
+        for (auto& arg : p)
+        {
+            BinaryenFunctionSetLocalName(result, i++, arg.c_str());
+        }
 
         //for (size_t i = functions.back() + 2; i < vars.size(); ++i)
         //    BinaryenFunctionSetLocalName(result, i - functions.back(), vars[i].c_str());
@@ -613,7 +618,7 @@ struct compiler : utils
                 ups.push_back(get_upvalue(index));
             }
         }
-        BinaryenExpressionRef exp[] = {BinaryenRefFunc(mod, name, sig), BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups))};
+        BinaryenExpressionRef exp[] = {BinaryenRefFunc(mod, name, sig), ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups))};
         return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_types::function>()));
     }
 
@@ -788,8 +793,6 @@ struct compiler : utils
     {
         BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_number", "print", "value", float_type(), BinaryenTypeNone());
-    
-
 
         BinaryenExpressionRef args[] = {null(), null()};
         auto exp                     = BinaryenCall(mod, "start", std::data(args), std::size(args), ref_array_type());

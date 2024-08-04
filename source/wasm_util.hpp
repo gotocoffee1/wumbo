@@ -62,6 +62,9 @@ struct utils
         return BinaryenTypeInt64();
     }
 
+    static inline BinaryenIndex args_index = 1;
+    static inline BinaryenIndex upvalue_index = 0;
+
     BinaryenExpressionRef new_value(BinaryenExpressionRef exp)
     {
         auto type = BinaryenExpressionGetType(exp);
