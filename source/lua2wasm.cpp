@@ -556,15 +556,38 @@ struct compiler : utils
         //    scope.emplace_back(name);
         vars.emplace_back(""); // upvalues
         vars.emplace_back(""); // args
+
+        std::vector<const char*> names = {"*none"};
+
         for (auto& arg : p)
         {
             vars.emplace_back(arg);
+            names.push_back(arg.c_str());
         }
-
-
-        //BinaryenLocalGet(mod)
         auto body = (*this)(inner);
+        if (!p.empty())
+        {
+            BinaryenExpressionRef exp[2] = {
+                BinaryenSwitch(mod, std::data(names), std::size(names) - 1, names.back(), BinaryenArrayLen(mod, BinaryenLocalGet(mod, args_index, ref_array_type())), nullptr),
 
+            };
+            size_t j = p.size();
+
+            for (auto iter = p.rbegin(); iter != p.rend(); ++iter)
+            {
+                j--;
+                exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), iter == p.rbegin() ? 1 : std::size(exp), BinaryenTypeAuto());
+                exp[1] = BinaryenLocalSet(mod,
+                                          j + 2,
+                                          BinaryenArrayGet(mod,
+                                                           BinaryenLocalGet(mod, args_index, ref_array_type()),
+                                                           const_i32(j),
+                                                           BinaryenTypeAnyref(),
+                                                           false));
+            }
+
+            body.insert(body.begin(), BinaryenBlock(mod, names[0], std::data(exp), std::size(exp), BinaryenTypeAuto()));
+        }
         body.push_back(BinaryenReturn(mod, null()));
 
         std::vector<BinaryenType> locals(count_locals{}(inner) + p.size(), BinaryenTypeAnyref());
@@ -792,7 +815,7 @@ struct compiler : utils
     auto convert()
     {
         BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
-        BinaryenAddFunctionImport(mod, "print_number", "print", "value", float_type(), BinaryenTypeNone());
+        BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
 
         BinaryenExpressionRef args[] = {null(), null()};
         auto exp                     = BinaryenCall(mod, "start", std::data(args), std::size(args), ref_array_type());
@@ -804,7 +827,7 @@ struct compiler : utils
         std::tuple<const char*, BinaryenType, BinaryenExpressionRef (*)(BinaryenModuleRef, BinaryenExpressionRef)> casts[] = {
             {"print_number", type<value_types::number>(), [](BinaryenModuleRef mod, BinaryenExpressionRef exp)
              {
-                 return BinaryenStructGet(mod, 0, exp, float_type(), false);
+                 return BinaryenStructGet(mod, 0, exp, number_type(), false);
              }},
             {"print_integer", type<value_types::integer>(), [](BinaryenModuleRef mod, BinaryenExpressionRef exp)
              {
@@ -822,7 +845,7 @@ struct compiler : utils
 
             block = BinaryenBlock(mod, std::get<0>(c), std::data(inner), std::size(inner), BinaryenTypeAuto());
             block = std::get<2>(c)(mod, block);
-            block = BinaryenReturn(mod, BinaryenCall(mod, std::get<0>(c), &block, 1, BinaryenTypeNone()));
+            block = BinaryenReturnCall(mod, std::get<0>(c), &block, 1, BinaryenTypeNone());
         }
 
         body.push_back(block);
@@ -844,8 +867,8 @@ wasm::mod compile(const block& chunk)
     BinaryenModuleRef mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
     compiler c{mod};
     c.build_types();
-    c.convert();
     auto start = c.add_func("start", chunk, {}, true);
+    c.convert();
     //BinaryenSetStart(mod, v);
     BinaryenAddFunctionExport(mod, "convert", "start");
     //BinaryenModuleAutoDrop(mod);

@@ -98,6 +98,7 @@ struct utils
         BinaryenModuleSetFeatures(
             mod,
             BinaryenModuleGetFeatures(mod)
+                | BinaryenFeatureTailCall()
                 | BinaryenFeatureGC()
                 | BinaryenFeatureBulkMemory()
                 | BinaryenFeatureReferenceTypes());
