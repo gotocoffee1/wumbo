@@ -351,8 +351,6 @@ struct compiler : utils
         };
 
         exp = BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false);
-
-        exp = BinaryenDrop(mod, exp);
         return exp;
     }
 
@@ -405,7 +403,7 @@ struct compiler : utils
 
             exp = _functail(functail, exp);
         }
-        return std::vector<BinaryenExpressionRef>{exp};
+        return std::vector<BinaryenExpressionRef>{BinaryenDrop(mod, exp)};
     }
     auto operator()(const label_statement& p)
     {
@@ -476,8 +474,7 @@ struct compiler : utils
         for (auto min = std::min(p.names.size(), explist.size()); i < min; ++i)
         {
             vars.emplace_back(p.names[i]);
-            auto exp = new_value(explist[i]);
-            exp      = BinaryenLocalSet(mod, offset + i, exp);
+            auto exp = BinaryenLocalSet(mod, offset + i, explist[i]);
             result.push_back(exp);
         }
 
@@ -506,7 +503,7 @@ struct compiler : utils
         std::vector<BinaryenExpressionRef> list;
         for (auto& exp : p)
         {
-            list.push_back((*this)(exp));
+            list.push_back(new_value((*this)(exp)));
         }
         return list;
     }
@@ -793,9 +790,6 @@ struct compiler : utils
         {
             auto list = (*this)(*p.retstat);
 
-            for (auto& l : list)
-                l = new_value(l);
-
             BinaryenExpressionRef ret;
             if (list.empty())
                 ret = null();
@@ -816,9 +810,10 @@ struct compiler : utils
     {
         BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
+        BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
 
         BinaryenExpressionRef args[] = {null(), null()};
-        auto exp                     = BinaryenCall(mod, "start", std::data(args), std::size(args), ref_array_type());
+        auto exp                     = BinaryenCall(mod, "*init", std::data(args), std::size(args), ref_array_type());
         exp                          = BinaryenArrayGet(mod, exp, const_i32(0), BinaryenTypeAnyref(), false);
         exp                          = BinaryenLocalSet(mod, 0, exp);
 
@@ -835,20 +830,31 @@ struct compiler : utils
              }},
         };
 
-        BinaryenExpressionRef block = BinaryenUnreachable(mod);
+        exp = BinaryenBrOn(mod, BinaryenBrOnNull(), "nil", BinaryenLocalGet(mod, 0, BinaryenTypeAnyref()), BinaryenTypeNone());
+
         for (auto& c : casts)
         {
-            BinaryenExpressionRef inner[] = {
-                BinaryenDrop(mod, BinaryenBrOn(mod, BinaryenBrOnCast(), std::get<0>(c), BinaryenLocalGet(mod, 0, BinaryenTypeAnyref()), std::get<1>(c))),
-                block,
-            };
-
-            block = BinaryenBlock(mod, std::get<0>(c), std::data(inner), std::size(inner), BinaryenTypeAuto());
-            block = std::get<2>(c)(mod, block);
-            block = BinaryenReturnCall(mod, std::get<0>(c), &block, 1, BinaryenTypeNone());
+            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), std::get<0>(c), exp, std::get<1>(c));
         }
 
-        body.push_back(block);
+        BinaryenExpressionRef block[] = {
+            BinaryenDrop(mod, exp),
+            BinaryenUnreachable(mod),
+        };
+        bool once = false;
+        for (auto& c : casts)
+        {
+            exp  = BinaryenBlock(mod, std::get<0>(c), once ? &exp : std::data(block), once ? 1 : std::size(block), BinaryenTypeAuto());
+            exp  = std::get<2>(c)(mod, exp);
+            exp  = BinaryenReturnCall(mod, std::get<0>(c), &exp, 1, BinaryenTypeNone());
+            once = true;
+        }
+
+        exp = BinaryenBlock(mod, "nil", &exp, 1, BinaryenTypeAuto());
+
+        body.push_back(exp);
+        exp = null();
+        body.push_back(BinaryenReturnCall(mod, "print_nil", &exp, 1, BinaryenTypeNone()));
 
         BinaryenType locals[] = {BinaryenTypeAnyref()};
         return BinaryenAddFunction(mod,
@@ -867,7 +873,7 @@ wasm::mod compile(const block& chunk)
     BinaryenModuleRef mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
     compiler c{mod};
     c.build_types();
-    auto start = c.add_func("start", chunk, {}, true);
+    auto start = c.add_func("*init", chunk, {}, true);
     c.convert();
     //BinaryenSetStart(mod, v);
     BinaryenAddFunctionExport(mod, "convert", "start");
