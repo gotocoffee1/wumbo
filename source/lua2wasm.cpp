@@ -347,7 +347,7 @@ struct compiler : utils
 
         BinaryenExpressionRef real_args[] = {
             upvalues,
-            BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), args.data(), args.size()),
+            args,
         };
 
         exp = BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false);
@@ -469,27 +469,27 @@ struct compiler : utils
         size_t i      = 0;
 
         std::vector<BinaryenExpressionRef> result;
-        result.reserve(std::max(p.names.size(), explist.size()));
+        //result.reserve(std::max(p.names.size(), explist.size()));
 
-        for (auto min = std::min(p.names.size(), explist.size()); i < min; ++i)
-        {
-            vars.emplace_back(p.names[i]);
-            auto exp = BinaryenLocalSet(mod, offset + i, explist[i]);
-            result.push_back(exp);
-        }
+        //for (auto min = std::min(p.names.size(), explist.size()); i < min; ++i)
+        //{
+        //    vars.emplace_back(p.names[i]);
+        //    auto exp = BinaryenLocalSet(mod, offset + i, explist[i]);
+        //    result.push_back(exp);
+        //}
 
-        while (i < p.names.size())
-        {
-            vars.emplace_back(p.names[i]);
-            i++;
-        }
+        //while (i < p.names.size())
+        //{
+        //    vars.emplace_back(p.names[i]);
+        //    i++;
+        //}
 
-        while (i < p.explist.size())
-        {
-            auto exp = BinaryenDrop(mod, explist[i]);
-            result.push_back(exp);
-            i++;
-        }
+        //while (i < p.explist.size())
+        //{
+        //    auto exp = BinaryenDrop(mod, explist[i]);
+        //    result.push_back(exp);
+        //    i++;
+        //}
         return result;
     }
 
@@ -498,14 +498,30 @@ struct compiler : utils
         return std::visit(*this, p.inner);
     }
 
-    auto operator()(const expression_list& p) -> std::vector<BinaryenExpressionRef>
+    auto operator()(const expression_list& p) -> BinaryenExpressionRef
     {
-        std::vector<BinaryenExpressionRef> list;
-        for (auto& exp : p)
+        BinaryenExpressionRef exp = null();
+
+        std::vector<BinaryenExpressionRef> result;
+        for (auto& e : p)
         {
-            list.push_back(new_value((*this)(exp)));
+            exp       = (*this)(e);
+            auto type = BinaryenExpressionGetType(exp);
+            if (type == ref_array_type())
+            {
+                if (p.size() == 1)
+                    return exp;
+
+                ///BinaryenArrayGet(mod, exp, const_i32(0), BinaryenTypeAnyref(), false);
+                //BinaryenSelect( BinaryenArrayGet(mod, exp, 0, BinaryenTypeAnyref(), false);
+            }
+            else
+                result.push_back(new_value(exp));
         }
-        return list;
+
+        exp = BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
+
+        return exp;
     }
 
     auto operator()(const nil&)
@@ -789,16 +805,7 @@ struct compiler : utils
         if (p.retstat)
         {
             auto list = (*this)(*p.retstat);
-
-            BinaryenExpressionRef ret;
-            if (list.empty())
-                ret = null();
-            else
-            {
-                ret = BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(list), std::size(list));
-            }
-
-            result.push_back(BinaryenReturn(mod, ret));
+            result.push_back(BinaryenReturn(mod, list));
         }
 
         vars.resize(blocks.back());
