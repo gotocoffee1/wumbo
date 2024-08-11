@@ -211,55 +211,6 @@ struct count_locals
     } // namespace lua2wasm
 };
 
-struct max_returns
-{
-    template<typename T>
-    size_t operator()(const T&)
-    {
-        return 0;
-    }
-
-    size_t operator()(const do_statement& p)
-    {
-        return (*this)(p.inner);
-    }
-    size_t operator()(const while_statement& p)
-    {
-        return (*this)(p.inner);
-    }
-    size_t operator()(const repeat_statement& p)
-    {
-        return (*this)(p.inner);
-    }
-    size_t operator()(const if_statement& p)
-    {
-        size_t returns = p.else_block ? (*this)(*p.else_block) : 0;
-        for (auto& [cond, block] : p.cond_block)
-            returns = std::max((*this)(block), returns);
-
-        return returns;
-    }
-    size_t operator()(const for_statement& p)
-    {
-        return (*this)(p.inner);
-    }
-    size_t operator()(const for_each& p)
-    {
-        return (*this)(p.inner);
-    }
-
-    size_t operator()(const block& p)
-    {
-        size_t returns = p.retstat ? p.retstat->size() : 0;
-
-        for (auto& statement : p.statements)
-        {
-            returns = std::max(std::visit(*this, statement.inner), returns);
-        }
-        return returns;
-    } // namespace lua2wasm
-};
-
 struct compiler : utils
 {
     std::vector<std::string> vars;
@@ -268,12 +219,14 @@ struct compiler : utils
 
     std::vector<std::vector<size_t>> upvalues;
 
+    std::vector<std::tuple<std::vector<BinaryenType>, std::vector<bool>, size_t>> util_locals;
+
     size_t function_name = 0;
     size_t data_name     = 0;
 
     size_t local_offset(size_t index) const
     {
-        return index - functions.back();
+        return func_arg_count + (index - functions.back());
     }
 
     size_t local_offset() const
@@ -284,6 +237,32 @@ struct compiler : utils
     bool is_index_local(size_t index) const
     {
         return index >= functions.back();
+    }
+
+    void free_local(size_t pos)
+    {
+        auto& [types, used, offset] = util_locals.back();
+
+        used[pos - (func_arg_count + offset)] = false;
+    }
+
+    size_t alloc_local(BinaryenType type)
+    {
+        auto& [types, used, offset] = util_locals.back();
+
+        for (size_t i = 0; i < used.size(); ++i)
+        {
+            if (type == types[i] && !used[i])
+            {
+                used[i] = true;
+                return func_arg_count + offset + i;
+            }
+        }
+        auto size = types.size();
+        types.push_back(type);
+        used.push_back(true);
+
+        return func_arg_count + offset + size;
     }
 
     std::tuple<var_type, size_t> find(const std::string& var_name) const
@@ -340,18 +319,20 @@ struct compiler : utils
 
     BinaryenExpressionRef _functail(const functail& p, BinaryenExpressionRef function)
     {
+        auto t        = type<value_types::function>();
+        auto local    = alloc_local(t);
         auto args     = (*this)(p.args);
-        auto exp      = BinaryenRefCast(mod, function, type<value_types::function>());
-        auto func_ref = BinaryenStructGet(mod, 0, exp, BinaryenTypeFuncref(), false);
-        auto upvalues = BinaryenStructGet(mod, 1, exp, ref_array_type(), false);
+        auto tee      = BinaryenLocalTee(mod, local, BinaryenRefCast(mod, function, t), t);
+        auto func_ref = BinaryenStructGet(mod, 0, BinaryenLocalGet(mod, local, t), BinaryenTypeFuncref(), false);
+        auto upvalues = BinaryenStructGet(mod, 1, tee, ref_array_type(), false);
+        free_local(local);
 
         BinaryenExpressionRef real_args[] = {
             upvalues,
             args,
         };
 
-        exp = BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false);
-        return exp;
+        return BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false);
     }
 
     BinaryenExpressionRef _vartail(const vartail& p, BinaryenExpressionRef var)
@@ -500,28 +481,69 @@ struct compiler : utils
 
     auto operator()(const expression_list& p) -> BinaryenExpressionRef
     {
-        BinaryenExpressionRef exp = null();
-
         std::vector<BinaryenExpressionRef> result;
+        size_t i = 0;
         for (auto& e : p)
         {
-            exp       = (*this)(e);
+            i++;
+            auto exp  = (*this)(e);
             auto type = BinaryenExpressionGetType(exp);
             if (type == ref_array_type())
             {
                 if (p.size() == 1)
                     return exp;
 
-                ///BinaryenArrayGet(mod, exp, const_i32(0), BinaryenTypeAnyref(), false);
-                //BinaryenSelect( BinaryenArrayGet(mod, exp, 0, BinaryenTypeAnyref(), false);
+                auto local     = alloc_local(type);
+                auto local_get = BinaryenLocalGet(mod, local, type);
+                exp            = BinaryenLocalTee(mod, local, exp, type);
+                if (i == p.size())
+                {
+                    auto new_array = alloc_local(type);
+
+                    std::vector<BinaryenExpressionRef> res;
+
+                    res.push_back(BinaryenArrayCopy(mod,
+                                                    BinaryenLocalTee(mod,
+                                                                     new_array,
+                                                                     BinaryenArrayNew(mod,
+                                                                                      BinaryenTypeGetHeapType(type),
+                                                                                      BinaryenBinary(mod, BinaryenAddInt32(), const_i32(result.size()), BinaryenArrayLen(mod, exp)),
+                                                                                      nullptr),
+                                                                     type),
+                                                    const_i32(result.size()),
+                                                    local_get,
+                                                    const_i32(0),
+                                                    BinaryenArrayLen(mod, local_get)));
+                    size_t j = 0;
+                    for (auto& init : result)
+                        res.push_back(BinaryenArraySet(mod, BinaryenLocalGet(mod, new_array, type), const_i32(j++), init));
+
+                    res.push_back(BinaryenLocalGet(mod, new_array, type));
+
+                    free_local(local);
+                    free_local(new_array);
+                    return BinaryenBlock(mod, "", std::data(res), std::size(res), type);
+                }
+                else
+                {
+                    exp = BinaryenSelect(mod,
+                                         BinaryenArrayLen(mod, local_get),
+                                         BinaryenArrayGet(mod,
+                                                          exp,
+                                                          const_i32(0),
+                                                          BinaryenTypeAnyref(),
+                                                          false),
+                                         null(),
+                                         BinaryenTypeAnyref());
+                    result.push_back(exp);
+                    free_local(local);
+                }
             }
             else
                 result.push_back(new_value(exp));
         }
 
-        exp = BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
-
-        return exp;
+        return BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
     }
 
     auto operator()(const nil&)
@@ -567,16 +589,20 @@ struct compiler : utils
 
         //for (auto& name : p)
         //    scope.emplace_back(name);
-        vars.emplace_back(""); // upvalues
-        vars.emplace_back(""); // args
+        //vars.emplace_back("+upvalues");
+        //vars.emplace_back("+args");
 
-        std::vector<const char*> names = {"*none"};
+        std::vector<BinaryenType> locals(count_locals{}(inner) + p.size(), BinaryenTypeAnyref());
+        std::get<2>(util_locals.emplace_back()) = locals.size();
+
+        std::vector<const char*> names = {"+none"};
 
         for (auto& arg : p)
         {
             vars.emplace_back(arg);
             names.push_back(arg.c_str());
         }
+
         auto body = (*this)(inner);
         if (!p.empty())
         {
@@ -591,7 +617,7 @@ struct compiler : utils
                 j--;
                 exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), iter == p.rbegin() ? 1 : std::size(exp), BinaryenTypeAuto());
                 exp[1] = BinaryenLocalSet(mod,
-                                          j + 2,
+                                          j + func_arg_count,
                                           BinaryenArrayGet(mod,
                                                            BinaryenLocalGet(mod, args_index, ref_array_type()),
                                                            const_i32(j),
@@ -603,9 +629,8 @@ struct compiler : utils
         }
         body.push_back(BinaryenReturn(mod, null()));
 
-        std::vector<BinaryenType> locals(count_locals{}(inner) + p.size(), BinaryenTypeAnyref());
-        //std::vector<BinaryenType> params(p.size(), BinaryenTypeAnyref());
-        //std::vector<BinaryenType> returns(max_returns{}(inner), BinaryenTypeAnyref());
+        auto& types = std::get<0>(util_locals.back());
+        locals.insert(locals.end(), types.begin(), types.end());
 
         auto result = BinaryenAddFunctionWithHeapType(mod,
                                                       name,
@@ -617,7 +642,7 @@ struct compiler : utils
         BinaryenFunctionSetLocalName(result, args_index, "args");
         BinaryenFunctionSetLocalName(result, upvalue_index, "upvalues");
 
-        size_t i = 2;
+        size_t i = func_arg_count;
         for (auto& arg : p)
         {
             BinaryenFunctionSetLocalName(result, i++, arg.c_str());
@@ -628,6 +653,7 @@ struct compiler : utils
 
         vars.resize(functions.back());
         functions.pop_back();
+        util_locals.pop_back();
 
         return result;
     }

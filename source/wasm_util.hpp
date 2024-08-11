@@ -62,8 +62,9 @@ struct utils
         return BinaryenTypeInt64();
     }
 
-    static inline BinaryenIndex args_index = 1;
-    static inline BinaryenIndex upvalue_index = 0;
+    static constexpr BinaryenIndex args_index = 1;
+    static constexpr BinaryenIndex upvalue_index     = 0;
+    static constexpr BinaryenIndex func_arg_count    = 2;
 
     BinaryenExpressionRef new_value(BinaryenExpressionRef exp)
     {
@@ -140,7 +141,7 @@ struct utils
                 array_def{
                     BinaryenTypeAnyref(),
                     BinaryenPackedTypeNotPacked(),
-                    false,
+                    true,
                 },
             },
             {
