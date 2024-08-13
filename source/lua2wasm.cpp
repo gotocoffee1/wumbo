@@ -442,36 +442,11 @@ struct compiler : utils
 
         return {BinaryenLocalSet(mod, offset + 0, add_func_ref(p.name.c_str(), p.body))};
     }
-    auto operator()(const local_variables& p)
+    auto operator()(const local_variables& p) -> std::vector<BinaryenExpressionRef>
     {
         auto explist = (*this)(p.explist);
 
-        size_t offset = local_offset();
-        size_t i      = 0;
-
-        std::vector<BinaryenExpressionRef> result;
-        //result.reserve(std::max(p.names.size(), explist.size()));
-
-        //for (auto min = std::min(p.names.size(), explist.size()); i < min; ++i)
-        //{
-        //    vars.emplace_back(p.names[i]);
-        //    auto exp = BinaryenLocalSet(mod, offset + i, explist[i]);
-        //    result.push_back(exp);
-        //}
-
-        //while (i < p.names.size())
-        //{
-        //    vars.emplace_back(p.names[i]);
-        //    i++;
-        //}
-
-        //while (i < p.explist.size())
-        //{
-        //    auto exp = BinaryenDrop(mod, explist[i]);
-        //    result.push_back(exp);
-        //    i++;
-        //}
-        return result;
+        return {unpack_locals(p.names, explist)};
     }
 
     BinaryenExpressionRef operator()(const expression& p)
@@ -481,6 +456,8 @@ struct compiler : utils
 
     auto operator()(const expression_list& p) -> BinaryenExpressionRef
     {
+        if (p.empty())
+            return null();
         std::vector<BinaryenExpressionRef> result;
         size_t i = 0;
         for (auto& e : p)
@@ -583,6 +560,49 @@ struct compiler : utils
         return BinaryenUnreachable(mod);
     }
 
+    BinaryenExpressionRef unpack_locals(const name_list& p, BinaryenExpressionRef list)
+    {
+        auto offset = local_offset();
+
+        std::vector<const char*> names = {"+none"};
+        for (auto& arg : p)
+        {
+            vars.emplace_back(arg);
+            names.push_back(arg.c_str());
+        }
+
+        BinaryenExpressionRef exp[2] = {
+            BinaryenSwitch(mod,
+                           std::data(names),
+                           std::size(names) - 1,
+                           names.back(),
+                           BinaryenArrayLen(mod,
+                                            BinaryenBrOn(mod,
+                                                         BinaryenBrOnNull(),
+                                                         names[0],
+                                                         list,
+                                                         BinaryenTypeNone())),
+                           nullptr),
+
+        };
+        size_t j = p.size();
+
+        for (auto iter = p.rbegin(); iter != p.rend(); ++iter)
+        {
+            j--;
+            exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), iter == p.rbegin() ? 1 : std::size(exp), BinaryenTypeAuto());
+            exp[1] = BinaryenLocalSet(mod,
+                                      j + offset,
+                                      BinaryenArrayGet(mod,
+                                                       list,
+                                                       const_i32(j),
+                                                       BinaryenTypeAnyref(),
+                                                       false));
+        }
+
+        return BinaryenBlock(mod, names[0], std::data(exp), std::size(exp), BinaryenTypeAuto());
+    }
+
     auto add_func(const char* name, const block& inner, const name_list& p, bool vararg) -> BinaryenFunctionRef
     {
         functions.push_back(vars.size());
@@ -595,38 +615,13 @@ struct compiler : utils
         std::vector<BinaryenType> locals(count_locals{}(inner) + p.size(), BinaryenTypeAnyref());
         std::get<2>(util_locals.emplace_back()) = locals.size();
 
-        std::vector<const char*> names = {"+none"};
-
-        for (auto& arg : p)
-        {
-            vars.emplace_back(arg);
-            names.push_back(arg.c_str());
-        }
-
+        BinaryenExpressionRef init;
+        if (!p.empty())
+            init = unpack_locals(p, BinaryenLocalGet(mod, args_index, ref_array_type()));
         auto body = (*this)(inner);
         if (!p.empty())
-        {
-            BinaryenExpressionRef exp[2] = {
-                BinaryenSwitch(mod, std::data(names), std::size(names) - 1, names.back(), BinaryenArrayLen(mod, BinaryenLocalGet(mod, args_index, ref_array_type())), nullptr),
+            body.insert(body.begin(), init);
 
-            };
-            size_t j = p.size();
-
-            for (auto iter = p.rbegin(); iter != p.rend(); ++iter)
-            {
-                j--;
-                exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), iter == p.rbegin() ? 1 : std::size(exp), BinaryenTypeAuto());
-                exp[1] = BinaryenLocalSet(mod,
-                                          j + func_arg_count,
-                                          BinaryenArrayGet(mod,
-                                                           BinaryenLocalGet(mod, args_index, ref_array_type()),
-                                                           const_i32(j),
-                                                           BinaryenTypeAnyref(),
-                                                           false));
-            }
-
-            body.insert(body.begin(), BinaryenBlock(mod, names[0], std::data(exp), std::size(exp), BinaryenTypeAuto()));
-        }
         body.push_back(BinaryenReturn(mod, null()));
 
         auto& types = std::get<0>(util_locals.back());

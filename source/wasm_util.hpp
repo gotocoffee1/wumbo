@@ -229,9 +229,10 @@ struct utils
         TypeBuilderRef tb = TypeBuilderCreate(std::size(defs));
 
         BinaryenType ref_array = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
+        BinaryenType non_null_ref_array = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), false);
 
-        std::get<sig_def>(defs[1].inner).param_types.assign(2, ref_array);
-        std::get<sig_def>(defs[1].inner).return_types.assign(1, ref_array);
+        std::get<sig_def>(defs[1].inner).param_types.assign({ref_array, ref_array});
+        std::get<sig_def>(defs[1].inner).return_types.assign({ref_array});
 
         BinaryenType lua_function = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 1), true);
 
