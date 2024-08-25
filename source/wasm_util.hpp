@@ -39,9 +39,9 @@ struct utils
     }
 
     template<size_t N>
-    BinaryenExpressionRef make_block(std::array<BinaryenExpressionRef, N> list, const char* name = nullptr)
+    BinaryenExpressionRef make_block(std::array<BinaryenExpressionRef, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
-        return BinaryenBlock(mod, name, std::data(list), std::size(list), BinaryenTypeAuto());
+        return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
     }
 
     static BinaryenType anyref()
@@ -92,14 +92,17 @@ struct ext_types : utils
     static constexpr BinaryenIndex tbl_array_index = 0;
     static constexpr BinaryenIndex tbl_hash_index  = 1;
 
+    std::size_t label_counter = 0;
+
     template<typename F>
     auto switch_value(BinaryenExpressionRef exp, const std::vector<std::tuple<const char*, value_types>>& casts, F&& code)
     {
-        exp = BinaryenBrOn(mod, BinaryenBrOnNull(), "nil", exp, BinaryenTypeNone());
+        auto n = "nil_" + std::to_string(label_counter++);
+        exp    = BinaryenBrOn(mod, BinaryenBrOnNull(), n.c_str(), exp, BinaryenTypeNone());
 
-        for (auto& c : casts)
+        for (auto& [name, vtype] : casts)
         {
-            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), std::get<const char*>(c), exp, type(std::get<value_types>(c)));
+            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), name, exp, type(vtype));
         }
 
         BinaryenExpressionRef inner[] = {
@@ -107,17 +110,17 @@ struct ext_types : utils
             code(value_types{-1}, nullptr),
         };
         bool once = false;
-        for (auto& c : casts)
+        for (auto& [name, vtype] : casts)
         {
-            exp  = BinaryenBlock(mod, std::get<const char*>(c), once ? &exp : std::data(inner), once ? 1 : std::size(inner), BinaryenTypeAuto());
-            exp  = code(std::get<value_types>(c), exp);
+            exp  = BinaryenBlock(mod, name, once ? &exp : std::data(inner), once ? 1 : std::size(inner), BinaryenTypeAuto());
+            exp  = code(vtype, exp);
             once = true;
         }
 
-        return make_block(std::array{
-            BinaryenBlock(mod, "nil", &exp, 1, BinaryenTypeAuto()),
+        return std::array{
+            BinaryenBlock(mod, n.c_str(), &exp, 1, BinaryenTypeAuto()),
             code(value_types::nil, nullptr),
-        });
+        };
     }
 
     BinaryenExpressionRef new_value(BinaryenExpressionRef exp)

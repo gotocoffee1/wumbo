@@ -223,6 +223,7 @@ struct compiler : ext_types
 
     size_t function_name = 0;
     size_t data_name     = 0;
+    size_t label_name    = 0;
 
     size_t local_offset(size_t index) const
     {
@@ -574,9 +575,9 @@ struct compiler : ext_types
 
     BinaryenExpressionRef unpack_locals(const name_list& p, BinaryenExpressionRef list)
     {
-        auto offset = local_offset();
-
-        std::vector<const char*> names = {"+none"};
+        auto offset                    = local_offset();
+        std::string none               = "+none" + std::to_string(label_name++);
+        std::vector<const char*> names = {none.c_str()};
         for (auto& arg : p)
         {
             vars.emplace_back(arg);
@@ -739,12 +740,74 @@ struct compiler : ext_types
 
     BinaryenExpressionRef table_get(BinaryenExpressionRef table, BinaryenExpressionRef key)
     {
-        auto hash = calc_hash(key);
+        BinaryenExpressionRef args[] = {
+            table,
+            key,
+        };
 
-        auto bucket = find_bucket(table, hash);
+        return BinaryenCall(mod, "*table_get", std::data(args), std::size(args), anyref());
+    }
+
+    BinaryenFunctionRef compare(const char* name, value_types vtype)
+    {
+        std::vector<std::tuple<const char*, value_types>> casts = {
+            {
+                name,
+                vtype,
+            },
+        };
+        auto exp = local_get(0, type(vtype));
+
+        BinaryenType params[] = {
+            type(vtype),
+            anyref(),
+        };
+
+        return BinaryenAddFunction(mod,
+                                   (std::string("*key_compare_") + name).c_str(),
+                                   BinaryenTypeCreate(std::data(params), std::size(params)),
+                                   BinaryenTypeInt32(),
+                                   nullptr,
+                                   0,
+                                   make_block(switch_value(local_get(1, anyref()), casts, [&](value_types type_right, BinaryenExpressionRef exp_right)
+                                                           {
+                                                               if (vtype != type_right)
+                                                               {
+                                                                   if (!exp_right)
+                                                                       return BinaryenUnreachable(mod);
+                                                                   return const_i32(0);
+                                                               }
+                                                               switch (type_right)
+                                                               {
+                                                               case value_types::integer:
+                                                                   return BinaryenReturn(mod, BinaryenBinary(mod, BinaryenEqInt64(), BinaryenStructGet(mod, 0, exp, integer_type(), false), BinaryenStructGet(mod, 0, exp_right, integer_type(), false)));
+                                                               case value_types::number:
+                                                                   return BinaryenReturn(mod, BinaryenBinary(mod, BinaryenEqFloat64(), BinaryenStructGet(mod, 0, exp, number_type(), false), BinaryenStructGet(mod, 0, exp_right, number_type(), false)));
+                                                               case value_types::table:
+                                                               case value_types::function:
+                                                               case value_types::thread:
+                                                                   return BinaryenRefEq(mod, exp, exp_right);
+                                                               case value_types::nil:
+                                                               case value_types::boolean:
+                                                               case value_types::string:
+                                                               case value_types::userdata:
+                                                               case value_types::dynamic:
+                                                               default:
+                                                                   return BinaryenUnreachable(mod);
+                                                               }
+                                                           }),
+                                              nullptr,
+                                              BinaryenTypeInt32()));
+    }
+
+    BinaryenFunctionRef func_table_get()
+    {
+        //auto hash = calc_hash(key);
+
+        //auto bucket = find_bucket(table, hash);
 
         //auto bucket = ;
-        auto i = alloc_local(BinaryenTypeInt32());
+        size_t i = 2;
 
         auto dec = [&](BinaryenExpressionRef first)
         {
@@ -754,8 +817,10 @@ struct compiler : ext_types
                                   const_i32(2));
         };
         //(BinaryenExpressionRef[]){            BinaryenLocalSet(mod, i, dec(BinaryenArrayLen(mod, bucket)))};
-
-        //BinaryenCall(mod, "*compare_keys", )
+        auto table  = BinaryenLocalGet(mod, 0, anyref());
+        auto key    = BinaryenLocalGet(mod, 1, anyref());
+        table       = BinaryenRefCast(mod, table, type<value_types::table>());
+        auto bucket = BinaryenStructGet(mod, tbl_hash_index, table, ref_array_type(), false);
 
         std::vector<std::tuple<const char*, value_types>> casts = {
             {
@@ -768,59 +833,73 @@ struct compiler : ext_types
             },
         };
 
+        for (auto& [name, value] : casts)
+            compare(name, value);
+
         auto result = switch_value(key,
                                    casts,
                                    [&](value_types type, BinaryenExpressionRef exp)
                                    {
-                                       return make_block(std::array {
+                                       std::string loop = "+loop" + std::to_string(label_name++);
+
+                                       BinaryenExpressionRef args[] = {
+                                           exp,
+                                           BinaryenArrayGet(mod, bucket, local_get(i, BinaryenTypeInt32()), anyref(), false),
+                                       };
+                                       const char* comparator;
+                                       switch (type)
+                                       {
+                                       case value_types::integer:
+                                           comparator = "*key_compare_integer";
+                                           break;
+                                       case value_types::number:
+                                           comparator = "*key_compare_number";
+                                           break;
+                                       case value_types::nil:
+                                       case value_types::boolean:
+                                       case value_types::string:
+                                       case value_types::function:
+                                       case value_types::userdata:
+                                       case value_types::thread:
+                                       case value_types::table:
+
+                                       default:
+                                       case value_types::dynamic:
+                                           return BinaryenUnreachable(mod);
+                                       }
+
+                                       return make_block(std::array{
                                            BinaryenLocalSet(mod, i, dec(BinaryenArrayLen(mod, bucket))),
-                                               BinaryenLoop(mod,
-                                                            "+loop",
-                                                            make_block(std::array{
-                                                                switch_value(BinaryenArrayGet(mod, bucket, local_get(i, BinaryenTypeInt32()), ref_array_type(), false), casts, [&](value_types type_right, BinaryenExpressionRef exp_right)
-                                                                             {
-                                                                                 if (type != type_right)
-                                                                                     return const_i32(0);
+                                           BinaryenLoop(mod,
+                                                        loop.c_str(),
+                                                        make_block(std::array{
 
-                                                                                 switch (type)
-                                                                                 {
-                                                                                 case value_types::boolean:
-                                                                                     break;
-                                                                                 case value_types::integer:
-                                                                                     //TODO
-                                                                                     return BinaryenBinary(mod,
-                                                                                                           BinaryenEqInt64(),
-                                                                                                           BinaryenStructGet(mod, 0, exp, integer_type(), false),
-                                                                                                           BinaryenStructGet(mod, 0, exp_right, integer_type(), false));
+                                                            BinaryenIf(mod,
+                                                                       BinaryenCall(mod, comparator, std::data(args), std::size(args), BinaryenTypeInt32()),
+                                                                       BinaryenReturn(mod, BinaryenArrayGet(mod, bucket, BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, BinaryenTypeInt32()), const_i32(1)), anyref(), false)),
+                                                                       nullptr),
 
-                                                                                     break;
-                                                                                 case value_types::number:
-
-                                                                                     return BinaryenBinary(mod,
-                                                                                                           BinaryenEqFloat64(),
-                                                                                                           BinaryenStructGet(mod, 0, exp, number_type(), false),
-                                                                                                           BinaryenStructGet(mod, 0, exp_right, number_type(), false));
-                                                                                     break;
-                                                                                 case value_types::table:
-                                                                                 case value_types::function:
-                                                                                 case value_types::thread:
-                                                                                     return BinaryenRefEq(mod, exp, exp_right);
-                                                                                 case value_types::nil:
-                                                                                 case value_types::string:
-                                                                                 case value_types::userdata:
-                                                                                 case value_types::dynamic:
-                                                                                 default:
-                                                                                     return BinaryenUnreachable(mod);
-                                                                                 }
-                                                                             }),
-
-                                                                BinaryenBreak(mod, "+loop", BinaryenLocalTee(mod, i, dec(local_get(i, BinaryenTypeInt32())), BinaryenTypeInt32()), nullptr),
-                                                            })),
-                                               BinaryenReturn(mod, null()),
+                                                            BinaryenBreak(mod, loop.c_str(), BinaryenLocalTee(mod, i, dec(local_get(i, BinaryenTypeInt32())), BinaryenTypeInt32()), nullptr),
+                                                        })),
+                                           BinaryenReturn(mod, null()),
                                        });
                                    });
-        free_local(i);
-        return result;
+
+        BinaryenType params[] = {
+            anyref(),
+            anyref(),
+        };
+
+        BinaryenType locals[] = {
+            BinaryenTypeInt32(),
+        };
+        return BinaryenAddFunction(mod,
+                                   "*table_get",
+                                   BinaryenTypeCreate(std::data(params), std::size(params)),
+                                   anyref(),
+                                   std::data(locals),
+                                   std::size(locals),
+                                   make_block(result));
     }
 
     auto operator()(const table_constructor& p)
@@ -853,8 +932,8 @@ struct compiler : ext_types
         BinaryenExpressionRef table_init[] = {
 
             array,
-            array,
-            //BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(pair_list()), std::data(exp), std::size(exp)),
+            //array,
+            BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(exp), std::size(exp)),
         };
         return BinaryenStructNew(mod, std::data(table_init), std::size(table_init), BinaryenTypeGetHeapType(type<value_types::table>()));
     }
@@ -954,6 +1033,7 @@ struct compiler : ext_types
 
     auto convert()
     {
+        func_table_get();
         BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
@@ -1014,7 +1094,7 @@ struct compiler : ext_types
                                    BinaryenTypeNone(),
                                    std::data(locals),
                                    std::size(locals),
-                                   switch_value(exp, casts, s));
+                                   make_block(switch_value(exp, casts, s)));
     }
 };
 
