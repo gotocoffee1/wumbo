@@ -38,6 +38,11 @@ struct utils
         return BinaryenLocalGet(mod, index, type);
     }
 
+    BinaryenExpressionRef local_set(size_t index, BinaryenExpressionRef value)
+    {
+        return BinaryenLocalSet(mod, index, value);
+    }
+
     template<size_t N>
     BinaryenExpressionRef make_block(std::array<BinaryenExpressionRef, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
@@ -52,17 +57,19 @@ struct utils
 
 struct ext_types : utils
 {
-    BinaryenType types[11];
+    static constexpr size_t type_count = 12;
+
+    BinaryenType types[type_count];
 
     template<value_types T>
     BinaryenType type() const
     {
-        return types[static_cast<std::underlying_type_t<value_types>>(T) + 2];
+        return types[static_cast<std::underlying_type_t<value_types>>(T) + 3];
     }
 
     BinaryenType type(value_types t) const
     {
-        return types[static_cast<std::underlying_type_t<value_types>>(t) + 2];
+        return types[static_cast<std::underlying_type_t<value_types>>(t) + 3];
     }
 
     BinaryenExpressionRef new_number(BinaryenExpressionRef num)
@@ -143,10 +150,15 @@ struct ext_types : utils
 
     BinaryenType lua_func() const
     {
+        return types[3];
+    }
+
+    BinaryenType upvalue_type() const
+    {
         return types[1];
     }
 
-    BinaryenType pair_list() const
+    BinaryenType upvalue_array_type() const
     {
         return types[2];
     }
@@ -166,6 +178,7 @@ struct ext_types : utils
             std::vector<BinaryenType> field_types;
             std::vector<BinaryenPackedType> field_packs;
             std::vector<uint8_t> field_muts; // classic c++
+            std::vector<const char*> field_names;
         };
 
         struct array_def
@@ -187,10 +200,14 @@ struct ext_types : utils
             bool nullable = true;
         };
 
-        BinaryenType pair[] = {
-            BinaryenTypeAnyref(),
-            BinaryenTypeAnyref(),
-        };
+        TypeBuilderRef tb = TypeBuilderCreate(type_count);
+
+        BinaryenType ref_array          = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
+        BinaryenType non_null_ref_array = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), false);
+
+        BinaryenType lua_function  = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 3), true);
+        BinaryenType upvalue       = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 1), true);
+        BinaryenType upvalue_array = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 2), true);
 
         def defs[] = {
             {
@@ -202,18 +219,28 @@ struct ext_types : utils
                 },
             },
             {
-                "lua_function",
-                sig_def{
-                    {},
-                    {},
+                "upvalue",
+                struct_def{
+                    {anyref()},
+                    {BinaryenPackedTypeNotPacked()},
+                    {true},
+                    {"local_ref"},
+                },
+                false,
+            },
+            {
+                "upvalue_array",
+                array_def{
+                    upvalue,
+                    BinaryenPackedTypeNotPacked(),
+                    true,
                 },
             },
             {
-                "pair_list",
-                array_def{
-                    BinaryenTypeCreate(std::data(pair), std::size(pair)),
-                    BinaryenPackedTypeNotPacked(),
-                    false,
+                "lua_function",
+                sig_def{
+                    {upvalue_array, ref_array},
+                    {ref_array},
                 },
             },
             {
@@ -246,15 +273,15 @@ struct ext_types : utils
                     BinaryenTypeInt32(),
                     BinaryenPackedTypeInt8(),
                     false,
-
                 },
             },
             {
                 "function",
                 struct_def{
-                    {BinaryenTypeNone(), BinaryenTypeNone()},
+                    {lua_function, upvalue_array},
                     {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
                     {false, false},
+                    {"function_ref", "upvalues"},
                 },
             },
             {
@@ -276,28 +303,15 @@ struct ext_types : utils
             {
                 "table",
                 struct_def{
-                    {BinaryenTypeNone(), BinaryenTypeNone()},
+                    {ref_array, ref_array},
                     {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
                     {false, false},
+                    {"array", "hash"},
                 },
             },
         };
 
-        TypeBuilderRef tb = TypeBuilderCreate(std::size(defs));
-
-        BinaryenType ref_array          = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
-        BinaryenType non_null_ref_array = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), false);
-
-        std::get<sig_def>(defs[1].inner).param_types.assign({ref_array, ref_array});
-        std::get<sig_def>(defs[1].inner).return_types.assign({ref_array});
-
-        BinaryenType lua_function = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 1), true);
-
-        std::get<struct_def>(defs[7].inner).field_types[0] = lua_function;
-        std::get<struct_def>(defs[7].inner).field_types[1] = ref_array;
-
-        std::get<struct_def>(defs[10].inner).field_types[tbl_array_index] = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
-        std::get<struct_def>(defs[10].inner).field_types[tbl_hash_index]  = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
+        static_assert(type_count == std::size(defs));
 
         for (size_t i = 0; i < std::size(defs); ++i)
         {
@@ -324,7 +338,11 @@ struct ext_types : utils
                            [&](sig_def& def)
                            {
                                auto& [params, returns] = def;
-                               TypeBuilderSetSignatureType(tb, i, TypeBuilderGetTempTupleType(tb, params.data(), params.size()), TypeBuilderGetTempTupleType(tb, returns.data(), returns.size()));
+                               TypeBuilderSetSignatureType(
+                                   tb,
+                                   i,
+                                   TypeBuilderGetTempTupleType(tb, params.data(), params.size()),
+                                   TypeBuilderGetTempTupleType(tb, returns.data(), returns.size()));
 
                                //TypeBuilderSetSignatureType(tb, i, BinaryenTypeCreate(params.data(), params.size()), BinaryenTypeCreate(returns.data(), returns.size()));
                            },
@@ -346,6 +364,21 @@ struct ext_types : utils
 
             types[i] = BinaryenTypeFromHeapType(heap_types[i], def.nullable);
             BinaryenModuleSetTypeName(mod, heap_types[i], def.type_name.c_str());
+
+            std::visit(overload{
+                           [&](array_def& def) {
+
+                           },
+                           [&](struct_def& def)
+                           {
+                               for (size_t j = 0; j < std::size(def.field_names); ++j)
+                                   BinaryenModuleSetFieldName(mod, heap_types[i], j, def.field_names[j]);
+                           },
+                           [&](sig_def& def) {
+
+                           },
+                       },
+                       defs[i].inner);
         }
     }
 };
