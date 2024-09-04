@@ -2,7 +2,7 @@
 
 #include "binaryen-c.h"
 
-namespace lua2wasm
+namespace wumbo
 {
 
 enum class value_types
@@ -41,6 +41,11 @@ struct utils
     BinaryenExpressionRef local_set(size_t index, BinaryenExpressionRef value)
     {
         return BinaryenLocalSet(mod, index, value);
+    }
+
+    BinaryenExpressionRef local_tee(size_t index, BinaryenExpressionRef value, BinaryenType type)
+    {
+        return BinaryenLocalTee(mod, index, value, type);
     }
 
     template<size_t N>
@@ -383,4 +388,4 @@ struct ext_types : utils
     }
 };
 
-} // namespace lua2wasm
+} // namespace wumbo

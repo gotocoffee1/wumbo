@@ -3,7 +3,7 @@
 #include "ast.hpp"
 #include "wasm.hpp"
 
-namespace lua2wasm
+namespace wumbo
 {
 wasm::mod compile(const ast::block& chunk);
-} // namespace lua2wasm
+} // namespace wumbo

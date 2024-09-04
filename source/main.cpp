@@ -20,7 +20,7 @@ int main(int argc, char** argv)
             ast::printer p{std::cout};
             p(chunk);
 
-            wasm::mod result = lua2wasm::compile(chunk);
+            wasm::mod result = wumbo::compile(chunk);
 
 
             std::ofstream f("out.wasm", std::ios::binary);
