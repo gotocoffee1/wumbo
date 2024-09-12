@@ -48,6 +48,16 @@ struct utils
         return BinaryenLocalTee(mod, index, value, type);
     }
 
+    BinaryenExpressionRef array_len(BinaryenExpressionRef array)
+    {
+        return BinaryenArrayLen(mod, array);
+    }
+
+    BinaryenExpressionRef array_get(BinaryenExpressionRef array, BinaryenExpressionRef index, BinaryenType type, bool is_signed = false)
+    {
+        return BinaryenArrayGet(mod, array, index, type, is_signed);
+    }
+
     template<size_t N>
     BinaryenExpressionRef make_block(std::array<BinaryenExpressionRef, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
@@ -57,6 +67,22 @@ struct utils
     static BinaryenType anyref()
     {
         return BinaryenTypeAnyref();
+    }
+
+    BinaryenExpressionRef resize_array(size_t new_array, BinaryenType type, BinaryenExpressionRef old_array, BinaryenExpressionRef grow, bool move_front = false)
+    {
+        return BinaryenArrayCopy(mod,
+                                 BinaryenLocalTee(mod,
+                                                  new_array,
+                                                  BinaryenArrayNew(mod,
+                                                                   BinaryenTypeGetHeapType(type),
+                                                                   BinaryenBinary(mod, BinaryenAddInt32(), grow, array_len(old_array)),
+                                                                   nullptr),
+                                                  type),
+                                 move_front ? grow : const_i32(0),
+                                 old_array,
+                                 const_i32(0),
+                                 array_len(old_array));
     }
 };
 
@@ -310,7 +336,7 @@ struct ext_types : utils
                 struct_def{
                     {ref_array, ref_array},
                     {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
-                    {false, false},
+                    {true, true},
                     {"array", "hash"},
                 },
             },

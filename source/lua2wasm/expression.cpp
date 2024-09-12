@@ -26,19 +26,8 @@ BinaryenExpressionRef compiler::operator()(const expression_list& p)
                 auto new_array = alloc_local(type);
 
                 std::vector<BinaryenExpressionRef> copy;
+                copy.push_back(resize_array(new_array, type, l_get, const_i32(result.size()), true));
 
-                copy.push_back(BinaryenArrayCopy(mod,
-                                                 BinaryenLocalTee(mod,
-                                                                  new_array,
-                                                                  BinaryenArrayNew(mod,
-                                                                                   BinaryenTypeGetHeapType(type),
-                                                                                   BinaryenBinary(mod, BinaryenAddInt32(), const_i32(result.size()), BinaryenArrayLen(mod, l_get)),
-                                                                                   nullptr),
-                                                                  type),
-                                                 const_i32(result.size()),
-                                                 l_get,
-                                                 const_i32(0),
-                                                 BinaryenArrayLen(mod, l_get)));
                 size_t j = 0;
                 for (auto& init : result)
                     copy.push_back(BinaryenArraySet(mod, local_get(new_array, type), const_i32(j++), init));
