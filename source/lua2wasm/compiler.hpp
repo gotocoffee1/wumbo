@@ -220,6 +220,9 @@ struct compiler : ext_types
 
     std::vector<std::vector<size_t>> upvalues;
 
+    // count nested loops per function
+    std::vector<size_t> loop_stack;
+
     std::vector<std::tuple<std::vector<BinaryenType>, std::vector<bool>, size_t>> util_locals;
 
     size_t function_name = 0;
@@ -350,42 +353,108 @@ struct compiler : ext_types
         std::vector<BinaryenExpressionRef> result;
         return result;
     }
-    auto operator()(const key_break& p)
+    std::vector<BinaryenExpressionRef> operator()(const key_break& p)
     {
-        std::vector<BinaryenExpressionRef> result;
-        return result;
+        if (loop_stack.back() > 0)
+
+            return {BinaryenBreak(mod, "loop_end", nullptr, nullptr)};
+        return {BinaryenUnreachable(mod)};
     }
     auto operator()(const goto_statement& p)
     {
         std::vector<BinaryenExpressionRef> result;
         return result;
     }
-    auto operator()(const do_statement& p)
+    auto to_bool()
     {
-        return std::vector<BinaryenExpressionRef>{(*this)(p.inner)};
+        std::vector<std::tuple<const char*, value_types>> casts = {
+            {
+                "boolean",
+                value_types::boolean,
+            },
+        };
+
+        return BinaryenAddFunction(mod,
+                                   "*to_bool",
+                                   anyref(),
+                                   BinaryenTypeInt32(),
+                                   nullptr,
+                                   0,
+                                   make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, BinaryenExpressionRef exp)
+                                                           {
+                                                               const char* func;
+                                                               switch (type)
+                                                               {
+                                                               case value_types::nil:
+                                                                   return BinaryenReturn(mod, const_i32(0));
+                                                               case value_types::boolean:
+                                                                   return BinaryenReturn(mod, BinaryenI31Get(mod, exp, false));
+                                                               default:
+                                                                   return BinaryenReturn(mod, const_i32(1));
+                                                               }
+                                                           })));
     }
-    auto operator()(const while_statement& p)
+    std::vector<BinaryenExpressionRef> operator()(const do_statement& p)
     {
-        std::vector<BinaryenExpressionRef> result;
-        return result;
+        return (*this)(p.inner);
     }
-    auto operator()(const repeat_statement& p)
+    std::vector<BinaryenExpressionRef> operator()(const while_statement& p)
     {
-        std::vector<BinaryenExpressionRef> result;
-        return result;
+        loop_stack.back()++;
+        auto cond = (*this)(p.condition);
+
+        auto body = (*this)(p.inner);
+        body.push_back(BinaryenBreak(mod, "loop", BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32()), nullptr));
+
+        auto result = make_block({
+                                     BinaryenBreak(mod, "loop_end", BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32())), nullptr),
+                                     BinaryenLoop(mod, "loop", make_block(body)),
+
+                                 },
+                                 "loop_end");
+        loop_stack.back()--;
+        return {result};
     }
-    auto operator()(const if_statement& p)
+    std::vector<BinaryenExpressionRef> operator()(const repeat_statement& p)
     {
-        std::vector<BinaryenExpressionRef> result;
-        return result;
+        loop_stack.back()++;
+
+        auto cond = (*this)(p.condition);
+
+        auto body = (*this)(p.inner);
+        body.push_back(BinaryenBreak(mod, "loop", BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32())), nullptr));
+        auto result = BinaryenLoop(mod, "loop", make_block(body, "loop_end"));
+        loop_stack.back()--;
+        return {result};
+    }
+
+    std::vector<BinaryenExpressionRef> operator()(const if_statement& p)
+    {
+        BinaryenExpressionRef res = nullptr;
+        for (auto& [cond_exp, body] : p.cond_block)
+        {
+            auto cond = (*this)(cond_exp);
+            auto temp = BinaryenIf(mod, BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32()), make_block((*this)(body)), nullptr);
+            if (res)
+                BinaryenIfSetIfFalse(res, temp);
+            res = temp;
+        }
+        if (p.else_block)
+            BinaryenIfSetIfFalse(res, make_block((*this)(*p.else_block)));
+
+        return {res};
     }
     auto operator()(const for_statement& p)
     {
+        loop_stack.back()++;
+        loop_stack.back()--;
         std::vector<BinaryenExpressionRef> result;
         return result;
     }
     auto operator()(const for_each& p)
     {
+        loop_stack.back()++;
+        loop_stack.back()--;
         std::vector<BinaryenExpressionRef> result;
         return result;
     }
@@ -502,6 +571,7 @@ struct compiler : ext_types
     auto add_func(const char* name, const block& inner, const name_list& p, bool vararg) -> BinaryenFunctionRef
     {
         functions.push_back(vars.size());
+        loop_stack.push_back(0);
 
         //for (auto& name : p)
         //    scope.emplace_back(name);
@@ -541,6 +611,8 @@ struct compiler : ext_types
 
         //for (size_t i = functions.back() + 2; i < vars.size(); ++i)
         //    BinaryenFunctionSetLocalName(result, i - functions.back(), vars[i].c_str());
+
+        loop_stack.pop_back();
 
         vars.resize(functions.back());
         functions.pop_back();
@@ -699,6 +771,7 @@ struct compiler : ext_types
     auto convert()
     {
         func_table_get();
+        to_bool();
         BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());

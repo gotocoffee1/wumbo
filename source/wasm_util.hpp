@@ -61,6 +61,14 @@ struct utils
     template<size_t N>
     BinaryenExpressionRef make_block(std::array<BinaryenExpressionRef, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
+        static_assert(N > 1);
+        return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
+    } 
+    
+    BinaryenExpressionRef make_block(std::vector<BinaryenExpressionRef> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
+    {
+        if (list.size() == 1 && name == nullptr)
+            return list[0];
         return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
     }
 
@@ -411,6 +419,8 @@ struct ext_types : utils
                        },
                        defs[i].inner);
         }
+
+        types[static_cast<std::underlying_type_t<value_types>>(value_types::boolean) + 3] = BinaryenTypeI31ref();
     }
 };
 
