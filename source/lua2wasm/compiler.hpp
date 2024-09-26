@@ -222,6 +222,23 @@ struct compiler : ext_types
 
     // count nested loops per function
     std::vector<size_t> loop_stack;
+    size_t loop_counter;
+
+    struct loop_scope
+    {
+        compiler& _self;
+        loop_scope(compiler* self)
+            : _self{*self}
+        {
+            _self.loop_stack.back()++;
+            _self.loop_counter++;
+        }
+
+        ~loop_scope()
+        {
+            _self.loop_stack.back()--;
+        }
+    };
 
     std::vector<std::tuple<std::vector<BinaryenType>, std::vector<bool>, size_t>> util_locals;
 
@@ -353,13 +370,6 @@ struct compiler : ext_types
         std::vector<BinaryenExpressionRef> result;
         return result;
     }
-    std::vector<BinaryenExpressionRef> operator()(const key_break& p)
-    {
-        if (loop_stack.back() > 0)
-
-            return {BinaryenBreak(mod, "loop_end", nullptr, nullptr)};
-        return {BinaryenUnreachable(mod)};
-    }
     auto operator()(const goto_statement& p)
     {
         std::vector<BinaryenExpressionRef> result;
@@ -377,7 +387,7 @@ struct compiler : ext_types
         return BinaryenAddFunction(mod,
                                    "*to_bool",
                                    anyref(),
-                                   BinaryenTypeInt32(),
+                                   size_type(),
                                    nullptr,
                                    0,
                                    make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, BinaryenExpressionRef exp)
@@ -398,35 +408,6 @@ struct compiler : ext_types
     {
         return (*this)(p.inner);
     }
-    std::vector<BinaryenExpressionRef> operator()(const while_statement& p)
-    {
-        loop_stack.back()++;
-        auto cond = (*this)(p.condition);
-
-        auto body = (*this)(p.inner);
-        body.push_back(BinaryenBreak(mod, "loop", BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32()), nullptr));
-
-        auto result = make_block({
-                                     BinaryenBreak(mod, "loop_end", BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32())), nullptr),
-                                     BinaryenLoop(mod, "loop", make_block(body)),
-
-                                 },
-                                 "loop_end");
-        loop_stack.back()--;
-        return {result};
-    }
-    std::vector<BinaryenExpressionRef> operator()(const repeat_statement& p)
-    {
-        loop_stack.back()++;
-
-        auto cond = (*this)(p.condition);
-
-        auto body = (*this)(p.inner);
-        body.push_back(BinaryenBreak(mod, "loop", BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32())), nullptr));
-        auto result = BinaryenLoop(mod, "loop", make_block(body, "loop_end"));
-        loop_stack.back()--;
-        return {result};
-    }
 
     std::vector<BinaryenExpressionRef> operator()(const if_statement& p)
     {
@@ -434,7 +415,7 @@ struct compiler : ext_types
         for (auto& [cond_exp, body] : p.cond_block)
         {
             auto cond = (*this)(cond_exp);
-            auto temp = BinaryenIf(mod, BinaryenCall(mod, "*to_bool", &cond, 1, BinaryenTypeInt32()), make_block((*this)(body)), nullptr);
+            auto temp = make_if(make_call("*to_bool", cond, size_type()), make_block((*this)(body)));
             if (res)
                 BinaryenIfSetIfFalse(res, temp);
             res = temp;
@@ -444,20 +425,13 @@ struct compiler : ext_types
 
         return {res};
     }
-    auto operator()(const for_statement& p)
-    {
-        loop_stack.back()++;
-        loop_stack.back()--;
-        std::vector<BinaryenExpressionRef> result;
-        return result;
-    }
-    auto operator()(const for_each& p)
-    {
-        loop_stack.back()++;
-        loop_stack.back()--;
-        std::vector<BinaryenExpressionRef> result;
-        return result;
-    }
+
+    std::vector<BinaryenExpressionRef> operator()(const for_statement& p);
+    std::vector<BinaryenExpressionRef> operator()(const key_break& p);
+    std::vector<BinaryenExpressionRef> operator()(const while_statement& p);
+    std::vector<BinaryenExpressionRef> operator()(const repeat_statement& p);
+    std::vector<BinaryenExpressionRef> operator()(const for_each& p);
+
     auto operator()(const function_definition& p) -> std::vector<BinaryenExpressionRef>
     {
         return {add_func_ref(p.function_name.back().c_str(), p.body)};
@@ -774,11 +748,57 @@ struct compiler : ext_types
         to_bool();
         BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
+        BinaryenAddFunctionImport(mod, "print_string", "print", "string", BinaryenTypeExternref(), BinaryenTypeNone());
         BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
+        BinaryenAddFunctionImport(mod, "new_u8array", "print", "array", size_type(), BinaryenTypeExternref());
 
-        BinaryenExpressionRef args[] = {null(), null()};
-        auto exp                     = BinaryenCall(mod, "*init", std::data(args), std::size(args), ref_array_type());
-        exp                          = BinaryenArrayGet(mod, exp, const_i32(0), anyref(), false);
+        {
+            BinaryenType types[] = {
+                BinaryenTypeExternref(),
+                size_type(),
+                size_type(),
+            };
+            BinaryenAddFunctionImport(mod, "set_array", "print", "set_array", BinaryenTypeCreate(std::data(types), std::size(types)), BinaryenTypeNone());
+        }
+        {
+            BinaryenType locals[] = {
+                size_type(),
+                BinaryenTypeExternref(),
+            };
+
+            auto str     = local_get(0, type<value_types::string>()); // get string
+            auto str_len = array_len(str);                            // get string len
+            BinaryenAddFunction(mod,
+                                "*lua_str_to_js_array",
+                                type<value_types::string>(),
+                                BinaryenTypeExternref(),
+                                std::data(locals),
+                                std::size(locals),
+                                make_block(std::array{
+                                    local_set(1, str_len),
+                                    local_set(2, make_call("new_u8array", str_len, BinaryenTypeExternref())),
+                                    make_if(local_get(1, size_type()),
+                                            BinaryenLoop(mod,
+                                                         "+loop",
+                                                         make_block(std::array{
+                                                             make_call("set_array",
+                                                                       std::array{
+                                                                           local_get(2, BinaryenTypeExternref()),
+                                                                           local_tee(1, BinaryenBinary(mod, BinaryenSubInt32(), local_get(1, size_type()), const_i32(1)), size_type()),
+                                                                           array_get(str, local_get(1, size_type()), char_type()),
+                                                                       },
+                                                                       BinaryenTypeNone()),
+                                                             BinaryenBreak(mod,
+                                                                           "+loop",
+                                                                           local_get(1, size_type()),
+                                                                           nullptr),
+                                                         }))),
+
+                                    BinaryenReturn(mod, local_get(2, BinaryenTypeExternref())),
+                                }));
+        }
+        auto exp                     = make_call("*init", std::array{null(), null()}, ref_array_type());
+        exp                          = array_get(exp, const_i32(0), anyref());
 
         std::vector<std::tuple<const char*, value_types>> casts = {
             {
@@ -788,6 +808,10 @@ struct compiler : ext_types
             {
                 "integer",
                 value_types::integer,
+            },
+            {
+                "string",
+                value_types::string,
             },
         };
 
@@ -813,9 +837,11 @@ struct compiler : ext_types
                 exp  = BinaryenStructGet(mod, 0, exp, number_type(), false);
                 break;
             case value_types::string:
+            {
                 func = "print_string";
-                exp  = BinaryenStructGet(mod, 0, exp, number_type(), false);
+                exp  = make_call("*lua_str_to_js_array", exp, BinaryenTypeExternref());
                 break;
+            }
             case value_types::function:
             case value_types::userdata:
             case value_types::thread:
@@ -828,13 +854,28 @@ struct compiler : ext_types
         };
 
         BinaryenType locals[] = {anyref()};
+
+        const char* tags[]              = {error_tag};
+        BinaryenExpressionRef catches[] = {
+            make_block(std::array{
+                BinaryenDrop(mod, BinaryenPop(mod, anyref())),
+                BinaryenUnreachable(mod),
+            })};
+
         return BinaryenAddFunction(mod,
                                    "convert",
                                    BinaryenTypeNone(),
                                    BinaryenTypeNone(),
                                    std::data(locals),
                                    std::size(locals),
-                                   make_block(switch_value(exp, casts, s)));
+                                   BinaryenTry(mod,
+                                               nullptr,
+                                               make_block(switch_value(exp, casts, s)),
+                                               std::data(tags),
+                                               std::size(tags),
+                                               std::data(catches),
+                                               std::size(catches),
+                                               nullptr));
     }
 };
 } // namespace wumbo

@@ -63,13 +63,29 @@ struct utils
     {
         static_assert(N > 1);
         return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
-    } 
-    
+    }
+
     BinaryenExpressionRef make_block(std::vector<BinaryenExpressionRef> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
         if (list.size() == 1 && name == nullptr)
             return list[0];
         return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
+    }
+
+    template<size_t N>
+    BinaryenExpressionRef make_call(const char* target, std::array<BinaryenExpressionRef, N> args, BinaryenType btype)
+    {
+        return BinaryenCall(mod, target, std::data(args), std::size(args), btype);
+    }
+
+    BinaryenExpressionRef make_call(const char* target, BinaryenExpressionRef arg, BinaryenType btype)
+    {
+        return BinaryenCall(mod, target, &arg, 1, btype);
+    }
+
+    BinaryenExpressionRef make_if(BinaryenExpressionRef cond, BinaryenExpressionRef if_true, BinaryenExpressionRef if_false = nullptr)
+    {
+        return BinaryenIf(mod, cond, if_true, if_false);
     }
 
     static BinaryenType anyref()
@@ -100,6 +116,8 @@ struct ext_types : utils
 
     BinaryenType types[type_count];
 
+    const char* error_tag = "error";
+
     template<value_types T>
     BinaryenType type() const
     {
@@ -129,6 +147,17 @@ struct ext_types : utils
     static BinaryenType integer_type()
     {
         return BinaryenTypeInt64();
+    }    
+    
+    
+    static BinaryenType size_type()
+    {
+        return BinaryenTypeInt32();
+    }   
+    
+    static BinaryenType char_type()
+    {
+        return BinaryenTypeInt32();
     }
 
     static constexpr BinaryenIndex args_index     = 1;
@@ -209,6 +238,7 @@ struct ext_types : utils
             BinaryenModuleGetFeatures(mod)
                 | BinaryenFeatureTailCall()
                 | BinaryenFeatureGC()
+                | BinaryenFeatureExceptionHandling()
                 | BinaryenFeatureBulkMemory()
                 | BinaryenFeatureReferenceTypes());
 
@@ -309,7 +339,7 @@ struct ext_types : utils
             {
                 "string",
                 array_def{
-                    BinaryenTypeInt32(),
+                    char_type(),
                     BinaryenPackedTypeInt8(),
                     false,
                 },
@@ -420,7 +450,14 @@ struct ext_types : utils
                        defs[i].inner);
         }
 
+        BinaryenAddTag(mod, error_tag, anyref(), BinaryenTypeNone());
+
         types[static_cast<std::underlying_type_t<value_types>>(value_types::boolean) + 3] = BinaryenTypeI31ref();
+    }
+
+    BinaryenExpressionRef throw_error(BinaryenExpressionRef error)
+    {
+        return BinaryenThrow(mod, error_tag, &error, 1);
     }
 };
 

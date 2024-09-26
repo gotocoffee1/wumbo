@@ -19,23 +19,22 @@ BinaryenExpressionRef compiler::find_bucket(BinaryenExpressionRef table, Binarye
 
 BinaryenExpressionRef compiler::table_get(BinaryenExpressionRef table, BinaryenExpressionRef key)
 {
-    BinaryenExpressionRef args[] = {
-        table,
-        key,
-    };
-
-    return BinaryenCall(mod, "*table_get", std::data(args), std::size(args), anyref());
+    return make_call("*table_get",
+                     std::array{
+                         table,
+                         key,
+                     },
+                     anyref());
 }
 
 BinaryenExpressionRef compiler::table_set(BinaryenExpressionRef table, BinaryenExpressionRef key, BinaryenExpressionRef value)
 {
-    BinaryenExpressionRef args[] = {
-        table,
-        key,
-        value,
-    };
-
-    return BinaryenCall(mod, "*table_set", std::data(args), std::size(args), BinaryenTypeNone());
+    return make_call("*table_set", std::array{
+                                       table,
+                                       key,
+                                       value,
+                                   },
+                     BinaryenTypeNone());
 }
 
 BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
@@ -77,7 +76,7 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
                                              {
                                                  auto string_t = type<value_types::string>();
                                                  auto i        = vars.size() + std::size(params);
-                                                 vars.push_back(BinaryenTypeInt32());
+                                                 vars.push_back(size_type());
                                                  auto exp_i = vars.size() + std::size(params);
                                                  vars.push_back(string_t);
                                                  auto exp_right_i = vars.size() + std::size(params);
@@ -93,18 +92,18 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
 
                                                  return BinaryenReturn(mod,
                                                                        BinaryenIf(mod,
-                                                                                  BinaryenBinary(mod, BinaryenEqInt32(), local_tee(i, array_len(local_tee(exp_i, exp, string_t)), BinaryenTypeInt32()), array_len(local_tee(exp_right_i, exp_right, string_t))),
+                                                                                  BinaryenBinary(mod, BinaryenEqInt32(), local_tee(i, array_len(local_tee(exp_i, exp, string_t)), size_type()), array_len(local_tee(exp_right_i, exp_right, string_t))),
                                                                                   BinaryenLoop(mod,
                                                                                                "+loop",
                                                                                                BinaryenIf(mod,
-                                                                                                          local_get(i, BinaryenTypeInt32()),
+                                                                                                          local_get(i, size_type()),
                                                                                                           make_block(std::array{
                                                                                                               BinaryenBreak(mod,
                                                                                                                             "+loop",
                                                                                                                             BinaryenBinary(mod,
                                                                                                                                            BinaryenEqInt32(),
-                                                                                                                                           array_get(local_get(exp_i, string_t), local_tee(i, dec(local_get(i, BinaryenTypeInt32())), BinaryenTypeInt32()), BinaryenTypeInt32()),
-                                                                                                                                           array_get(local_get(exp_right_i, string_t), local_get(i, BinaryenTypeInt32()), BinaryenTypeInt32())),
+                                                                                                                                           array_get(local_get(exp_i, string_t), local_tee(i, dec(local_get(i, size_type())), size_type()), char_type()),
+                                                                                                                                           array_get(local_get(exp_right_i, string_t), local_get(i, size_type()), char_type())),
                                                                                                                             nullptr),
                                                                                                               const_i32(0),
                                                                                                           }),
@@ -121,12 +120,12 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
                                              }
                                          }),
                             nullptr,
-                            BinaryenTypeInt32());
+                            size_type());
 
     return BinaryenAddFunction(mod,
                                (std::string("*key_compare_") + name).c_str(),
                                BinaryenTypeCreate(std::data(params), std::size(params)),
-                               BinaryenTypeInt32(),
+                               size_type(),
                                std::data(vars),
                                std::size(vars),
                                block);
@@ -136,8 +135,8 @@ void compiler::func_table_get()
 {
     auto init_table_type_get = [this](const std::string& name, value_types vtype)
     {
-        auto table = BinaryenLocalGet(mod, 0, type<value_types::table>());
-        auto key   = BinaryenLocalGet(mod, 1, type(vtype));
+        auto table = local_get(0, type<value_types::table>());
+        auto key   = local_get(1, type(vtype));
 
         auto bucket = BinaryenStructGet(mod,
                                         tbl_hash_index,
@@ -151,16 +150,10 @@ void compiler::func_table_get()
         };
 
         BinaryenType locals[] = {
-            BinaryenTypeInt32(),
+            size_type(),
         };
 
-        size_t i                     = std::size(params);
-        BinaryenExpressionRef args[] = {
-            key,
-            array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, BinaryenTypeInt32()), const_i32(2)), BinaryenTypeInt32()), anyref()),
-        };
-
-        ;
+        size_t i = std::size(params);
 
         return BinaryenAddFunction(mod,
                                    ("*table_get_" + name).c_str(),
@@ -173,18 +166,19 @@ void compiler::func_table_get()
                                        BinaryenLoop(mod,
                                                     "+loop",
                                                     BinaryenIf(mod,
-                                                               local_get(i, BinaryenTypeInt32()),
+                                                               local_get(i, size_type()),
                                                                make_block(std::array{
                                                                    BinaryenBreak(mod,
                                                                                  "+loop",
-                                                                                 BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, ("*key_compare_" + name).c_str(), std::data(args), std::size(args), BinaryenTypeInt32())),
+                                                                                 BinaryenUnary(mod,
+                                                                                               BinaryenEqZInt32(),
+                                                                                               make_call(("*key_compare_" + name).c_str(), std::array{
+                                                                                                                                               key,
+                                                                                                                                               array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, size_type()), const_i32(2)), size_type()), anyref()),
+                                                                                                                                           },
+                                                                                                         size_type())),
                                                                                  nullptr),
-                                                                   BinaryenReturn(mod,
-                                                                                  BinaryenArrayGet(mod,
-                                                                                                   bucket,
-                                                                                                   BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, BinaryenTypeInt32()), const_i32(1)),
-                                                                                                   anyref(),
-                                                                                                   false)),
+                                                                   BinaryenReturn(mod, BinaryenArrayGet(mod, bucket, BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, size_type()), const_i32(1)), anyref(), false)),
                                                                }),
                                                                nullptr)),
 
@@ -194,9 +188,9 @@ void compiler::func_table_get()
 
     auto init_table_type_set = [this](const std::string& name, value_types vtype)
     {
-        auto table = BinaryenLocalGet(mod, 0, type<value_types::table>());
-        auto key   = BinaryenLocalGet(mod, 1, type(vtype));
-        auto value = BinaryenLocalGet(mod, 2, anyref());
+        auto table = local_get(0, type<value_types::table>());
+        auto key   = local_get(1, type(vtype));
+        auto value = local_get(2, anyref());
 
         auto bucket = BinaryenStructGet(mod,
                                         tbl_hash_index,
@@ -211,7 +205,7 @@ void compiler::func_table_get()
         };
 
         BinaryenType locals[] = {
-            BinaryenTypeInt32(),
+            size_type(),
             ref_array_type(),
         };
 
@@ -220,7 +214,7 @@ void compiler::func_table_get()
 
         BinaryenExpressionRef args[] = {
             key,
-            array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, BinaryenTypeInt32()), const_i32(2)), BinaryenTypeInt32()), anyref()),
+            array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, size_type()), const_i32(2)), size_type()), anyref()),
         };
 
         return BinaryenAddFunction(mod,
@@ -234,15 +228,15 @@ void compiler::func_table_get()
                                        BinaryenLoop(mod,
                                                     "+loop",
                                                     BinaryenIf(mod,
-                                                               local_get(i, BinaryenTypeInt32()),
+                                                               local_get(i, size_type()),
                                                                make_block(std::array{
                                                                    BinaryenBreak(mod,
                                                                                  "+loop",
-                                                                                 BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, ("*key_compare_" + name).c_str(), std::data(args), std::size(args), BinaryenTypeInt32())),
+                                                                                 BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, ("*key_compare_" + name).c_str(), std::data(args), std::size(args), size_type())),
                                                                                  nullptr),
                                                                    BinaryenArraySet(mod,
                                                                                     bucket,
-                                                                                    BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, BinaryenTypeInt32()), const_i32(1)),
+                                                                                    BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, size_type()), const_i32(1)),
                                                                                     value),
                                                                    BinaryenReturn(mod, nullptr),
                                                                }),
@@ -255,9 +249,9 @@ void compiler::func_table_get()
                                    }));
     };
 
-    auto table = BinaryenLocalGet(mod, 0, anyref());
-    auto key   = BinaryenLocalGet(mod, 1, anyref());
-    auto value = BinaryenLocalGet(mod, 2, anyref());
+    auto table = local_get(0, anyref());
+    auto key   = local_get(1, anyref());
+    auto value = local_get(2, anyref());
     table      = BinaryenRefCast(mod, table, type<value_types::table>());
 
     //auto hash = calc_hash(key);

@@ -11,7 +11,7 @@ project(
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 
-add_executable(wumbo source/main.cpp "source/parser.cpp" "source/lua2wasm.cpp" "source/wasm.cpp" "source/lua2wasm/locals.cpp" "source/lua2wasm/assignment_call.cpp" "source/lua2wasm/expression.cpp" "source/lua2wasm/table.cpp")
+add_executable(wumbo source/main.cpp "source/parser.cpp" "source/lua2wasm.cpp" "source/wasm.cpp" "source/lua2wasm/locals.cpp" "source/lua2wasm/assignment_call.cpp" "source/lua2wasm/expression.cpp" "source/lua2wasm/table.cpp" "source/lua2wasm/loop.cpp" "source/lua2wasm/basic_lib.cpp")
 add_executable(wumbo::wumbo ALIAS wumbo)
 
 find_package(CLI11 CONFIG REQUIRED)
