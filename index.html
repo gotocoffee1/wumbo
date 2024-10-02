@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<title>wumbo</title>
+<link rel="icon" href="data:,">
+
+<body>
+    <div id="result"></div>
+    <div id="ouput"></div>
+    <div id="error"></div>
+
+</body>
+<script>
+
+    const result = document.getElementById("result");
+    const error = document.getElementById("error");
+    const ouput = document.getElementById("ouput");
+
+    const importObject = {
+        print: {
+            value: arg => {
+                console.log(arg);
+                ouput.innerHTML += arg;
+            },
+            string: arg => {
+                arg = new TextDecoder().decode(arg)
+                console.log(arg);
+                ouput.innerHTML += arg;
+            },
+            array: size => new Uint8Array(size),
+            set_array: (array, index, value) => array[index] = value,
+        },
+    };
+
+
+
+    WebAssembly.instantiateStreaming(fetch("build/dev/Debug/out.wasm", { cache: "no-store" }), importObject).then(
+        ({ module, instance }) => {
+            const { start } = instance.exports;
+            result.innerHTML = start(null, null);
+        },
+    ).catch(e => {
+        error.innerHTML = e;
+    });
+    // py -m http.server
+    //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
+</script>
+
+
+
+</html>

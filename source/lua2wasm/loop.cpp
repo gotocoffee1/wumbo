@@ -5,17 +5,17 @@ namespace wumbo
 
 static std::string loop_end(compiler* self)
 {
-    return "loop_end" + std::to_string(self->loop_counter);
+    return "loop_end" + std::to_string(self->_func_stack.loop_counter);
 }
 
 static std::string loop_begin(compiler* self)
 {
-    return "loop_begin" + std::to_string(self->loop_counter);
+    return "loop_begin" + std::to_string(self->_func_stack.loop_counter);
 }
 
 std::vector<BinaryenExpressionRef> compiler::operator()(const key_break& p)
 {
-    if (loop_stack.back() > 0)
+    if (_func_stack.loop_stack.back() > 0)
     {
         auto end = loop_end(this);
 
@@ -27,7 +27,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const key_break& p)
 std::vector<BinaryenExpressionRef> compiler::operator()(const while_statement& p)
 
 {
-    loop_scope scope{this};
+    loop_scope scope{_func_stack};
     auto cond = (*this)(p.condition);
 
     auto body = (*this)(p.inner);
@@ -45,7 +45,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const while_statement& p
 }
 std::vector<BinaryenExpressionRef> compiler::operator()(const repeat_statement& p)
 {
-    loop_scope scope{this};
+    loop_scope scope{_func_stack};
 
     auto cond = (*this)(p.condition);
 
@@ -59,7 +59,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const repeat_statement& 
 
 std::vector<BinaryenExpressionRef> compiler::operator()(const for_statement& p)
 {
-    loop_scope scope{this};
+    loop_scope scope{_func_stack};
     auto begin = loop_begin(this);
     auto end   = loop_end(this);
     std::vector<BinaryenExpressionRef> result;
@@ -67,7 +67,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const for_statement& p)
 }
 std::vector<BinaryenExpressionRef> compiler::operator()(const for_each& p)
 {
-    loop_scope scope{this};
+    loop_scope scope{_func_stack};
     auto begin = loop_begin(this);
     auto end   = loop_end(this);
     std::vector<BinaryenExpressionRef> result;

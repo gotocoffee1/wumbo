@@ -21,12 +21,12 @@ BinaryenExpressionRef compiler::_funchead(const funchead& p)
 BinaryenExpressionRef compiler::_functail(const functail& p, BinaryenExpressionRef function)
 {
     auto t        = type<value_types::function>();
-    auto local    = alloc_local(t);
+
+    auto local    = help_var_scope{_func_stack, t};
     auto args     = (*this)(p.args);
     auto tee      = BinaryenLocalTee(mod, local, BinaryenRefCast(mod, function, t), t);
     auto func_ref = BinaryenStructGet(mod, 0, local_get(local, t), BinaryenTypeFuncref(), false);
     auto upvalues = BinaryenStructGet(mod, 1, tee, ref_array_type(), false);
-    free_local(local);
 
     BinaryenExpressionRef real_args[] = {
         upvalues,
@@ -102,7 +102,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const assignments& p)
 {
     std::vector<BinaryenExpressionRef> result;
 
-    auto local = alloc_local(ref_array_type());
+    auto local = help_var_scope{_func_stack, ref_array_type()};
     result.push_back(local_set(local, (*this)(p.explist)));
 
     size_t i = 0;
@@ -126,8 +126,6 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const assignments& p)
             }
         }
     }
-
-    free_local(local);
 
     return result;
 }

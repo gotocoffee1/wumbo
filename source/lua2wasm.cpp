@@ -10,6 +10,7 @@ wasm::mod compile(const block& chunk)
     BinaryenModuleRef mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
     compiler c{mod};
     c.build_types();
+    c.setup_env();
 
     auto start = c.add_func("*init", chunk, {}, true);
     c.convert();
