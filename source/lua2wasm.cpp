@@ -10,18 +10,16 @@ wasm::mod compile(const block& chunk)
     BinaryenModuleRef mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
     compiler c{mod};
     c.build_types();
-    c.setup_env();
+    c.convert(chunk); // remove
 
-    auto start = c.add_func("*init", chunk, {}, true);
-    c.convert();
+
+    //c.convert();
     //BinaryenSetStart(mod, v);
-    BinaryenAddFunctionExport(mod, "convert", "start");
+    //BinaryenAddFunctionExport(mod, "convert", "start");
     //BinaryenModuleAutoDrop(mod);
     BinaryenModuleValidate(mod);
     //BinaryenModuleInterpret(mod);
     //BinaryenModuleOptimize(mod);
-    //BinaryenModuleSetTypeName(mod, builtHeapTypes[0], "SomeStruct");
-    //BinaryenModuleSetFieldName(mod, builtHeapTypes[0], 0, "SomeField");
     return result;
 }
 

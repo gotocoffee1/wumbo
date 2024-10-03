@@ -2,11 +2,11 @@
 
 namespace wumbo
 {
-BinaryenExpressionRef compiler::operator()(const expression_list& p)
+expr_ref compiler::operator()(const expression_list& p)
 {
     if (p.empty())
         return null();
-    std::vector<BinaryenExpressionRef> result;
+    expr_ref_list result;
     size_t i = 0;
     for (auto& e : p)
     {
@@ -26,7 +26,7 @@ BinaryenExpressionRef compiler::operator()(const expression_list& p)
             {
                 auto new_array = help_var_scope{_func_stack, type};
 
-                std::vector<BinaryenExpressionRef> copy;
+                expr_ref_list copy;
                 copy.push_back(resize_array(new_array, type, l_get, const_i32(result.size()), true));
 
                 size_t j = 0;
@@ -58,7 +58,7 @@ BinaryenExpressionRef compiler::operator()(const expression_list& p)
     return BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
 }
 
-BinaryenExpressionRef compiler::operator()(const expression& p)
+expr_ref compiler::operator()(const expression& p)
 {
     return std::visit(*this, p.inner);
 }

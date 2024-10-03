@@ -2,12 +2,12 @@
 
 namespace wumbo
 {
-BinaryenExpressionRef compiler::calc_hash(BinaryenExpressionRef key)
+expr_ref compiler::calc_hash(expr_ref key)
 {
     return const_i32(3);
 }
 
-BinaryenExpressionRef compiler::find_bucket(BinaryenExpressionRef table, BinaryenExpressionRef hash)
+expr_ref compiler::find_bucket(expr_ref table, expr_ref hash)
 {
     auto hash_map = BinaryenStructGet(mod, tbl_hash_index, table, ref_array_type(), false);
 
@@ -17,7 +17,7 @@ BinaryenExpressionRef compiler::find_bucket(BinaryenExpressionRef table, Binarye
     return bucket;
 }
 
-BinaryenExpressionRef compiler::table_get(BinaryenExpressionRef table, BinaryenExpressionRef key)
+expr_ref compiler::table_get(expr_ref table, expr_ref key)
 {
     return make_call("*table_get",
                      std::array{
@@ -27,7 +27,7 @@ BinaryenExpressionRef compiler::table_get(BinaryenExpressionRef table, BinaryenE
                      anyref());
 }
 
-BinaryenExpressionRef compiler::table_set(BinaryenExpressionRef table, BinaryenExpressionRef key, BinaryenExpressionRef value)
+expr_ref compiler::table_set(expr_ref table, expr_ref key, expr_ref value)
 {
     return make_call("*table_set", std::array{
                                        table,
@@ -53,7 +53,7 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
     };
     std::vector<BinaryenType> vars;
 
-    auto block = make_block(switch_value(local_get(1, anyref()), casts, [&](value_types type_right, BinaryenExpressionRef exp_right)
+    auto block = make_block(switch_value(local_get(1, anyref()), casts, [&](value_types type_right, expr_ref exp_right)
                                          {
                                              if (vtype != type_right)
                                              {
@@ -82,7 +82,7 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
                                                  auto exp_right_i = vars.size() + std::size(params);
                                                  vars.push_back(string_t);
 
-                                                 auto dec = [&](BinaryenExpressionRef first)
+                                                 auto dec = [&](expr_ref first)
                                                  {
                                                      return BinaryenBinary(mod,
                                                                            BinaryenSubInt32(),
@@ -212,7 +212,7 @@ void compiler::func_table_get()
         size_t i         = std::size(params);
         size_t new_array = std::size(params) + 1;
 
-        BinaryenExpressionRef args[] = {
+        expr_ref args[] = {
             key,
             array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, size_type()), const_i32(2)), size_type()), anyref()),
         };
@@ -295,9 +295,9 @@ void compiler::func_table_get()
                             0,
                             make_block(switch_value(key,
                                                     casts,
-                                                    [&](value_types type, BinaryenExpressionRef exp)
+                                                    [&](value_types type, expr_ref exp)
                                                     {
-                                                        BinaryenExpressionRef args[] = {
+                                                        expr_ref args[] = {
                                                             table,
                                                             exp,
                                                         };
@@ -352,9 +352,9 @@ void compiler::func_table_get()
                             0,
                             make_block(switch_value(key,
                                                     casts,
-                                                    [&](value_types type, BinaryenExpressionRef exp)
+                                                    [&](value_types type, expr_ref exp)
                                                     {
-                                                        BinaryenExpressionRef args[] = {
+                                                        expr_ref args[] = {
                                                             table,
                                                             exp,
                                                             value,
@@ -393,9 +393,9 @@ void compiler::func_table_get()
     }
 }
 
-BinaryenExpressionRef compiler::operator()(const table_constructor& p)
+expr_ref compiler::operator()(const table_constructor& p)
 {
-    std::vector<BinaryenExpressionRef> exp;
+    expr_ref_list exp;
     expression_list array_init;
     for (auto& field : p)
     {
@@ -420,7 +420,7 @@ BinaryenExpressionRef compiler::operator()(const table_constructor& p)
 
     auto array = (*this)(array_init);
 
-    BinaryenExpressionRef table_init[] = {
+    expr_ref table_init[] = {
 
         array,
         BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(exp), std::size(exp)),

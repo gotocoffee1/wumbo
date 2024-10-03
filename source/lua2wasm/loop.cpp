@@ -13,7 +13,7 @@ static std::string loop_begin(compiler* self)
     return "loop_begin" + std::to_string(self->_func_stack.loop_counter);
 }
 
-std::vector<BinaryenExpressionRef> compiler::operator()(const key_break& p)
+expr_ref_list compiler::operator()(const key_break& p)
 {
     if (_func_stack.loop_stack.back() > 0)
     {
@@ -24,7 +24,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const key_break& p)
 
     return {throw_error(null())};
 }
-std::vector<BinaryenExpressionRef> compiler::operator()(const while_statement& p)
+expr_ref_list compiler::operator()(const while_statement& p)
 
 {
     loop_scope scope{_func_stack};
@@ -43,7 +43,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const while_statement& p
                        },
                        end.c_str())};
 }
-std::vector<BinaryenExpressionRef> compiler::operator()(const repeat_statement& p)
+expr_ref_list compiler::operator()(const repeat_statement& p)
 {
     loop_scope scope{_func_stack};
 
@@ -57,20 +57,20 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const repeat_statement& 
     return {BinaryenLoop(mod, begin.c_str(), make_block(body, end.c_str()))};
 }
 
-std::vector<BinaryenExpressionRef> compiler::operator()(const for_statement& p)
+expr_ref_list compiler::operator()(const for_statement& p)
 {
     loop_scope scope{_func_stack};
     auto begin = loop_begin(this);
     auto end   = loop_end(this);
-    std::vector<BinaryenExpressionRef> result;
+    expr_ref_list result;
     return result;
 }
-std::vector<BinaryenExpressionRef> compiler::operator()(const for_each& p)
+expr_ref_list compiler::operator()(const for_each& p)
 {
     loop_scope scope{_func_stack};
     auto begin = loop_begin(this);
     auto end   = loop_end(this);
-    std::vector<BinaryenExpressionRef> result;
+    expr_ref_list result;
     return result;
 }
 } // namespace wumbo

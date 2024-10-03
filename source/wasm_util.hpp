@@ -19,53 +19,70 @@ enum class value_types
     dynamic,
 };
 
+using expr_ref      = BinaryenExpressionRef;
+using expr_ref_list = std::vector<expr_ref>;
+
+template<typename T, typename U>
+std::vector<T>& append(std::vector<T>& self, U&& other)
+{
+    self.insert(self.end(), std::begin(other), std::end(other));
+    return self;
+}
+
+template<typename T, typename U>
+std::vector<T> append(std::vector<T>&& self, U&& other)
+{
+    self.insert(self.end(), std::begin(other), std::end(other));
+    return std::move(self);
+}
+
 struct utils
 {
     BinaryenModuleRef mod;
 
-    BinaryenExpressionRef const_i32(int32_t num)
+    expr_ref const_i32(int32_t num)
     {
         return BinaryenConst(mod, BinaryenLiteralInt32(num));
     }
 
-    BinaryenExpressionRef null()
+    expr_ref null()
     {
         return BinaryenRefNull(mod, BinaryenTypeNullref());
     }
 
-    BinaryenExpressionRef local_get(size_t index, BinaryenType type)
+    expr_ref local_get(size_t index, BinaryenType type)
     {
         return BinaryenLocalGet(mod, index, type);
     }
 
-    BinaryenExpressionRef local_set(size_t index, BinaryenExpressionRef value)
+    expr_ref local_set(size_t index, expr_ref value)
     {
         return BinaryenLocalSet(mod, index, value);
     }
 
-    BinaryenExpressionRef local_tee(size_t index, BinaryenExpressionRef value, BinaryenType type)
+    expr_ref local_tee(size_t index, expr_ref value, BinaryenType type)
     {
         return BinaryenLocalTee(mod, index, value, type);
     }
 
-    BinaryenExpressionRef array_len(BinaryenExpressionRef array)
+    expr_ref array_len(expr_ref array)
     {
         return BinaryenArrayLen(mod, array);
     }
 
-    BinaryenExpressionRef array_get(BinaryenExpressionRef array, BinaryenExpressionRef index, BinaryenType type, bool is_signed = false)
+    expr_ref array_get(expr_ref array, expr_ref index, BinaryenType type, bool is_signed = false)
     {
         return BinaryenArrayGet(mod, array, index, type, is_signed);
     }
 
     template<size_t N>
-    BinaryenExpressionRef make_block(std::array<BinaryenExpressionRef, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
+    expr_ref make_block(std::array<expr_ref, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
         static_assert(N > 1);
         return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
     }
 
-    BinaryenExpressionRef make_block(std::vector<BinaryenExpressionRef> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
+    expr_ref make_block(expr_ref_list list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
         if (list.size() == 1 && name == nullptr)
             return list[0];
@@ -73,17 +90,17 @@ struct utils
     }
 
     template<size_t N>
-    BinaryenExpressionRef make_call(const char* target, std::array<BinaryenExpressionRef, N> args, BinaryenType btype)
+    expr_ref make_call(const char* target, std::array<expr_ref, N> args, BinaryenType btype)
     {
         return BinaryenCall(mod, target, std::data(args), std::size(args), btype);
     }
 
-    BinaryenExpressionRef make_call(const char* target, BinaryenExpressionRef arg, BinaryenType btype)
+    expr_ref make_call(const char* target, expr_ref arg, BinaryenType btype)
     {
         return BinaryenCall(mod, target, &arg, 1, btype);
     }
 
-    BinaryenExpressionRef make_if(BinaryenExpressionRef cond, BinaryenExpressionRef if_true, BinaryenExpressionRef if_false = nullptr)
+    expr_ref make_if(expr_ref cond, expr_ref if_true, expr_ref if_false = nullptr)
     {
         return BinaryenIf(mod, cond, if_true, if_false);
     }
@@ -93,7 +110,7 @@ struct utils
         return BinaryenTypeAnyref();
     }
 
-    BinaryenExpressionRef resize_array(size_t new_array, BinaryenType type, BinaryenExpressionRef old_array, BinaryenExpressionRef grow, bool move_front = false)
+    expr_ref resize_array(size_t new_array, BinaryenType type, expr_ref old_array, expr_ref grow, bool move_front = false)
     {
         return BinaryenArrayCopy(mod,
                                  BinaryenLocalTee(mod,
@@ -129,12 +146,12 @@ struct ext_types : utils
         return types[static_cast<std::underlying_type_t<value_types>>(t) + 3];
     }
 
-    BinaryenExpressionRef new_number(BinaryenExpressionRef num)
+    expr_ref new_number(expr_ref num)
     {
         return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::number>()));
     }
 
-    BinaryenExpressionRef new_integer(BinaryenExpressionRef num)
+    expr_ref new_integer(expr_ref num)
     {
         return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::integer>()));
     }
@@ -147,14 +164,13 @@ struct ext_types : utils
     static BinaryenType integer_type()
     {
         return BinaryenTypeInt64();
-    }    
-    
-    
+    }
+
     static BinaryenType size_type()
     {
         return BinaryenTypeInt32();
-    }   
-    
+    }
+
     static BinaryenType char_type()
     {
         return BinaryenTypeInt32();
@@ -170,7 +186,7 @@ struct ext_types : utils
     std::size_t label_counter = 0;
 
     template<typename F>
-    auto switch_value(BinaryenExpressionRef exp, const std::vector<std::tuple<const char*, value_types>>& casts, F&& code)
+    auto switch_value(expr_ref exp, const std::vector<std::tuple<const char*, value_types>>& casts, F&& code)
     {
         auto n = "nil_" + std::to_string(label_counter++);
         exp    = BinaryenBrOn(mod, BinaryenBrOnNull(), n.c_str(), exp, BinaryenTypeNone());
@@ -180,7 +196,7 @@ struct ext_types : utils
             exp = BinaryenBrOn(mod, BinaryenBrOnCast(), name, exp, type(vtype));
         }
 
-        BinaryenExpressionRef inner[] = {
+        expr_ref inner[] = {
             BinaryenDrop(mod, exp),
             code(value_types{-1}, nullptr),
         };
@@ -198,7 +214,7 @@ struct ext_types : utils
         };
     }
 
-    BinaryenExpressionRef new_value(BinaryenExpressionRef exp)
+    expr_ref new_value(expr_ref exp)
     {
         auto type = BinaryenExpressionGetType(exp);
         if (type == number_type())
@@ -455,7 +471,7 @@ struct ext_types : utils
         types[static_cast<std::underlying_type_t<value_types>>(value_types::boolean) + 3] = BinaryenTypeI31ref();
     }
 
-    BinaryenExpressionRef throw_error(BinaryenExpressionRef error)
+    expr_ref throw_error(expr_ref error)
     {
         return BinaryenThrow(mod, error_tag, &error, 1);
     }

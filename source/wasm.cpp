@@ -16,7 +16,7 @@ void to_stream_bin(std::ostream& f, const wasm::mod& m)
 void to_stream_text(std::ostream& f, const wasm::mod& m)
 {
     auto mod = reinterpret_cast<BinaryenModuleRef>(m.impl.get());
-    auto res = BinaryenModuleAllocateAndWriteText(mod);
+    auto res = BinaryenModuleAllocateAndWriteStackIR(mod);
     f << res;
     free(res);
 }

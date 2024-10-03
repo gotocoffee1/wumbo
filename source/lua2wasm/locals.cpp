@@ -3,7 +3,7 @@
 namespace wumbo
 {
 
-std::vector<BinaryenExpressionRef> compiler::operator()(const local_function& p)
+expr_ref_list compiler::operator()(const local_function& p)
 {
     auto index      = _func_stack.alloc_lua_local(p.name, upvalue_type());
     bool is_upvalue = true;
@@ -16,7 +16,7 @@ std::vector<BinaryenExpressionRef> compiler::operator()(const local_function& p)
                           : func)};
 }
 
-std::vector<BinaryenExpressionRef> compiler::operator()(const local_variables& p)
+expr_ref_list compiler::operator()(const local_variables& p)
 {
     auto explist = (*this)(p.explist);
     auto local   = help_var_scope{_func_stack, ref_array_type()};

@@ -5,7 +5,9 @@
 
 <body>
     <div id="result"></div>
+    <hr />
     <div id="ouput"></div>
+    <hr />
     <div id="error"></div>
 
 </body>
@@ -19,12 +21,12 @@
         print: {
             value: arg => {
                 console.log(arg);
-                ouput.innerHTML += arg;
+                ouput.innerHTML += arg + "<br />";
             },
             string: arg => {
                 arg = new TextDecoder().decode(arg)
                 console.log(arg);
-                ouput.innerHTML += arg;
+                ouput.innerHTML += arg + "<br />";
             },
             array: size => new Uint8Array(size),
             set_array: (array, index, value) => array[index] = value,
@@ -36,7 +38,7 @@
     WebAssembly.instantiateStreaming(fetch("build/dev/Debug/out.wasm", { cache: "no-store" }), importObject).then(
         ({ module, instance }) => {
             const { start } = instance.exports;
-            result.innerHTML = start(null, null);
+            result.innerHTML = start();
         },
     ).catch(e => {
         error.innerHTML = e;
