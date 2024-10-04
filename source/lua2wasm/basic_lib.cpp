@@ -62,7 +62,7 @@ expr_ref_list compiler::open_basic_lib()
     result.push_back(set_var("print",
                              add_func_ref("*print", {}, true, [this]()
                                           {
-                                              auto exp = local_get(args_index, ref_array_type());
+                                              auto exp = (*this)(ellipsis{});
 
                                               exp = array_get(exp, const_i32(0), anyref());
 

@@ -22,8 +22,9 @@ expr_ref_list compiler::operator()(const key_break& p)
         return {BinaryenBreak(mod, end.c_str(), nullptr, nullptr)};
     }
 
-    return {throw_error(null())};
+    semantic_error("break outside loop");
 }
+
 expr_ref_list compiler::operator()(const while_statement& p)
 
 {

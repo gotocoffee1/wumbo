@@ -113,13 +113,12 @@ struct utils
     expr_ref resize_array(size_t new_array, BinaryenType type, expr_ref old_array, expr_ref grow, bool move_front = false)
     {
         return BinaryenArrayCopy(mod,
-                                 BinaryenLocalTee(mod,
-                                                  new_array,
-                                                  BinaryenArrayNew(mod,
-                                                                   BinaryenTypeGetHeapType(type),
-                                                                   BinaryenBinary(mod, BinaryenAddInt32(), grow, array_len(old_array)),
-                                                                   nullptr),
-                                                  type),
+                                 local_tee(new_array,
+                                           BinaryenArrayNew(mod,
+                                                            BinaryenTypeGetHeapType(type),
+                                                            BinaryenBinary(mod, BinaryenAddInt32(), grow, array_len(old_array)),
+                                                            nullptr),
+                                           type),
                                  move_front ? grow : const_i32(0),
                                  old_array,
                                  const_i32(0),
@@ -474,6 +473,11 @@ struct ext_types : utils
     expr_ref throw_error(expr_ref error)
     {
         return BinaryenThrow(mod, error_tag, &error, 1);
+    }
+
+    [[noreturn]] void semantic_error(std::string msg)
+    {
+        throw std::runtime_error(std::move(msg));
     }
 };
 

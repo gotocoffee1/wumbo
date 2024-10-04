@@ -161,6 +161,13 @@ struct compiler : ext_types
         static constexpr flag_t is_helper = 1 << 1;
     };
 
+    struct function_info
+    {
+        size_t offset;
+        size_t arg_count;
+        std::optional<size_t> vararg_offset;
+    };
+
     struct function_stack
     {
         // count nested loops per function
@@ -168,7 +175,7 @@ struct compiler : ext_types
         size_t loop_counter;
 
         std::vector<size_t> blocks;
-        std::vector<std::tuple<size_t, size_t>> functions;
+        std::vector<function_info> functions;
         std::vector<std::vector<size_t>> upvalues;
 
         std::vector<local_var> vars;
@@ -201,16 +208,20 @@ struct compiler : ext_types
             blocks.pop_back();
         }
 
-        void push_function(size_t func_arg_count = func_arg_count)
+        void push_function(size_t func_arg_count, std::optional<size_t> vararg_offset)
         {
             upvalues.emplace_back();
-            functions.emplace_back(vars.size(), func_arg_count);
+            auto& func_info         = functions.emplace_back();
+            func_info.offset        = vars.size();
+            func_info.arg_count     = func_arg_count;
+            func_info.vararg_offset = vararg_offset;
+
             loop_stack.push_back(0);
         }
 
         void pop_function()
         {
-            auto [func_offset, func_arg_count] = functions.back();
+            auto func_offset = functions.back().offset;
 
             loop_stack.pop_back();
 
@@ -221,9 +232,8 @@ struct compiler : ext_types
 
         size_t local_offset(size_t index) const
         {
-            auto [func_offset, func_arg_count] = functions.back();
-
-            return func_arg_count + (index - func_offset);
+            auto& func = functions.back();
+            return func.arg_count + (index - func.offset);
         }
 
         size_t local_offset() const
@@ -233,21 +243,20 @@ struct compiler : ext_types
 
         bool is_index_local(size_t index) const
         {
-            auto [func_offset, func_arg_count] = functions.back();
-
+            auto func_offset = functions.back().offset;
             return index >= func_offset;
         }
 
         void free_local(size_t pos)
         {
-            auto [func_offset, func_arg_count] = functions.back();
+            auto& func = functions.back();
 
-            vars[(pos - func_arg_count) + func_offset].flags &= ~local_var::is_used;
+            vars[(pos - func.arg_count) + func.offset].flags &= ~local_var::is_used;
         }
 
         size_t alloc_local(BinaryenType type, std::string_view name = "", bool helper = true)
         {
-            auto [func_offset, func_arg_count] = functions.back();
+            auto func_offset = functions.back().offset;
 
             for (size_t i = func_offset; i < vars.size(); ++i)
             {
@@ -354,10 +363,10 @@ struct compiler : ext_types
     {
         function_stack& _self;
 
-        function_frame(function_stack& self, size_t func_arg_count = func_arg_count)
+        function_frame(function_stack& self, size_t func_arg_count, std::optional<size_t> vararg_offset = std::nullopt)
             : _self{self}
         {
-            _self.push_function(func_arg_count);
+            _self.push_function(func_arg_count, vararg_offset);
         }
 
         ~function_frame()
@@ -367,7 +376,7 @@ struct compiler : ext_types
 
         std::vector<BinaryenType> get_local_type_list() const
         {
-            auto [func_offset, func_arg_count] = _self.functions.back();
+            auto func_offset = _self.functions.back().offset;
 
             std::vector<BinaryenType> locals;
             for (size_t i = func_offset; i < _self.vars.size(); ++i)
@@ -377,7 +386,7 @@ struct compiler : ext_types
 
         void set_local_names(BinaryenFunctionRef func) const
         {
-            auto [func_offset, func_arg_count] = _self.functions.back();
+            auto func_offset = _self.functions.back().offset;
 
             for (size_t i = func_offset; i < _self.vars.size(); ++i)
             {
@@ -577,23 +586,35 @@ struct compiler : ext_types
         return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_types::string>()), name.c_str(), const_i32(0), const_i32(str.size()));
     }
 
-    auto operator()(const literal& p)
+    expr_ref operator()(const literal& p)
     {
         return add_string(p.str);
     }
 
-    auto operator()(const ellipsis& p)
+    expr_ref operator()(const ellipsis& p)
     {
-        return BinaryenUnreachable(mod);
+        auto vararg_offset = _func_stack.functions.back().vararg_offset;
+        if (vararg_offset)
+        {
+            return local_get(*vararg_offset, ref_array_type());
+        }
+        semantic_error("cannot use '...' outside a vararg function near '...'");
     }
 
-    expr_ref_list unpack_locals(const name_list& p, expr_ref list)
+    expr_ref_list unpack_locals(const name_list& p, expr_ref list, bool is_vararg = false)
     {
         auto offset                    = _func_stack.local_offset();
         std::string none               = "+none" + std::to_string(label_name++);
         std::vector<const char*> names = {none.c_str()};
         bool is_upvalue                = true;
         expr_ref_list result;
+
+        if (p.empty())
+        {
+            if (is_vararg)
+                _func_stack.functions.back().vararg_offset = args_index;
+            return result;
+        }
 
         for (auto& arg : p)
         {
@@ -608,6 +629,13 @@ struct compiler : ext_types
                                                0,
                                                BinaryenTypeGetHeapType(upvalue_type()))));
         }
+
+        const char* vararg = "...";
+        if (is_vararg)
+        {
+            names.push_back(vararg);
+        }
+
         std::array<expr_ref, 2> exp = {
             BinaryenSwitch(mod,
                            std::data(names),
@@ -621,12 +649,36 @@ struct compiler : ext_types
                            nullptr),
 
         };
-        size_t j = p.size();
+        if (is_vararg)
+        {
+            exp[0] = BinaryenBlock(mod, vararg, std::data(exp), 1, BinaryenTypeAuto());
 
+            auto new_array                             = _func_stack.alloc_lua_local(vararg, ref_array_type());
+            _func_stack.functions.back().vararg_offset = new_array;
+
+            auto size = help_var_scope{_func_stack, size_type()};
+
+            auto calc_size = local_tee(size, BinaryenBinary(mod, BinaryenSubInt32(), array_len(list), const_i32(p.size())), size_type());
+            exp[1]         = BinaryenArrayCopy(mod,
+                                       local_tee(new_array,
+                                                 BinaryenArrayNew(mod,
+                                                                  BinaryenTypeGetHeapType(ref_array_type()),
+                                                                  calc_size,
+                                                                  nullptr),
+                                                 ref_array_type()),
+                                       const_i32(0),
+                                       list,
+                                       const_i32(p.size()),
+                                       local_get(size, size_type()));
+        }
+
+        bool first = !is_vararg;
+        size_t j   = p.size();
         for (auto iter = p.rbegin(); iter != p.rend(); ++iter)
         {
             j--;
-            exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), iter == p.rbegin() ? 1 : std::size(exp), BinaryenTypeAuto());
+            exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), first ? 1 : std::size(exp), BinaryenTypeAuto());
+            first  = false;
 
             auto get = array_get(
                 list,
@@ -651,12 +703,7 @@ struct compiler : ext_types
     {
         function_frame frame{_func_stack, func_arg_count};
 
-        //std::vector<BinaryenType> locals(/* count_locals{}(inner) +*/ p.size(), upvalue_type());
-
-        expr_ref_list body;
-        if (!p.empty())
-            body = unpack_locals(p, local_get(args_index, ref_array_type()));
-
+        expr_ref_list body = unpack_locals(p, local_get(args_index, ref_array_type()), vararg);
 
         append(body, f());
 
@@ -675,9 +722,6 @@ struct compiler : ext_types
         BinaryenFunctionSetLocalName(result, upvalue_index, "upvalues");
 
         frame.set_local_names(result);
-
-        //for (size_t i = functions.back() + 2; i < vars.size(); ++i)
-        //    BinaryenFunctionSetLocalName(result, i - functions.back(), vars[i].c_str());
 
         return std::tuple{result, frame.get_requested_upvalues()};
     }
@@ -852,35 +896,18 @@ struct compiler : ext_types
 
     auto convert(const block& chunk)
     {
-        {
-            function_frame frame{_func_stack, 0};
-
-            auto env = setup_env();
-
-
-            append(env, open_basic_lib());
-
-            auto start = add_func_ref("*init", chunk, {}, true);
-
-            env.push_back(BinaryenDrop(mod, call(start, null())));
-
-            auto locals = frame.get_local_type_list();
-            BinaryenAddFunction(mod,
-                                "*invoke",
-                                BinaryenTypeNone(),
-                                BinaryenTypeNone(),
-                                std::data(locals),
-                                std::size(locals),
-                                make_block(env));
-
-            BinaryenAddFunctionExport(mod, "*invoke", "start");
-        }
-
         func_table_get();
         to_bool();
 
-       
+        function_frame frame{_func_stack, 0, std::nullopt};
 
+        auto env = setup_env();
+
+        append(env, open_basic_lib());
+
+        auto start = add_func_ref("*init", chunk, {}, true);
+
+        env.push_back(BinaryenDrop(mod, call(start, null())));
 
         const char* tags[] = {error_tag};
         expr_ref catches[] = {
@@ -889,17 +916,25 @@ struct compiler : ext_types
                 BinaryenUnreachable(mod),
             })};
 
+        auto try_ = BinaryenTry(mod,
+                                nullptr,
+                                make_block(env),
+                                std::data(tags),
+                                std::size(tags),
+                                std::data(catches),
+                                std::size(catches),
+                                nullptr);
 
-        //BinaryenTry(mod,
-        //                                       nullptr,
-        //                                       make_block(switch_value(exp, casts, s)),
-        //                                       std::data(tags),
-        //                                       std::size(tags),
-        //                                       std::data(catches),
-        //                                       std::size(catches),
-        //                                       nullptr));
+        auto locals = frame.get_local_type_list();
+        BinaryenAddFunction(mod,
+                            "*invoke",
+                            BinaryenTypeNone(),
+                            BinaryenTypeNone(),
+                            std::data(locals),
+                            std::size(locals),
+                            try_);
 
-
+        BinaryenAddFunctionExport(mod, "*invoke", "start");
     }
 };
 } // namespace wumbo
