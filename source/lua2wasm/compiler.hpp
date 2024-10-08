@@ -489,6 +489,9 @@ struct compiler : ext_types
     auto operator()(const goto_statement& p)
     {
         expr_ref_list result;
+
+        //BinaryenBreak(mod, p.name.c_str(), nullptr, nullptr);
+
         return result;
     }
     auto to_bool()
@@ -527,19 +530,22 @@ struct compiler : ext_types
 
     expr_ref_list operator()(const if_statement& p)
     {
-        expr_ref res = nullptr;
+        expr_ref last  = nullptr;
+        expr_ref first = nullptr;
         for (auto& [cond_exp, body] : p.cond_block)
         {
             auto cond = (*this)(cond_exp);
-            auto temp = make_if(make_call("*to_bool", cond, size_type()), make_block((*this)(body)));
-            if (res)
-                BinaryenIfSetIfFalse(res, temp);
-            res = temp;
+            auto next = make_if(make_call("*to_bool", cond, size_type()), make_block((*this)(body)));
+            if (last)
+                BinaryenIfSetIfFalse(last, next);
+            else
+                first = next;
+            last = next;
         }
         if (p.else_block)
-            BinaryenIfSetIfFalse(res, make_block((*this)(*p.else_block)));
+            BinaryenIfSetIfFalse(last, make_block((*this)(*p.else_block)));
 
-        return {res};
+        return {first};
     }
 
     expr_ref_list operator()(const for_statement& p);
@@ -802,6 +808,7 @@ struct compiler : ext_types
     expr_ref_list open_basic_lib();
     expr_ref_list setup_env();
 
+    // TODO
     auto operator()(const bin_operation& p)
     {
         auto lhs_type = get_return_type(p.lhs);
@@ -867,6 +874,7 @@ struct compiler : ext_types
         return result;
     }
 
+    // TODO
     auto operator()(const un_operation& p)
     {
         auto rhs_type = get_return_type(p.rhs);
