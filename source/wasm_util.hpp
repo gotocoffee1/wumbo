@@ -50,6 +50,11 @@ struct utils
         return BinaryenRefNull(mod, BinaryenTypeNullref());
     }
 
+    expr_ref drop(expr_ref value)
+    {
+        return BinaryenDrop(mod, value);
+    }
+
     expr_ref local_get(size_t index, BinaryenType type)
     {
         return BinaryenLocalGet(mod, index, type);
@@ -105,6 +110,11 @@ struct utils
         return BinaryenIf(mod, cond, if_true, if_false);
     }
 
+    expr_ref make_return(expr_ref value = nullptr)
+    {
+        return BinaryenReturn(mod, value);
+    }
+
     static BinaryenType anyref()
     {
         return BinaryenTypeAnyref();
@@ -145,6 +155,14 @@ struct ext_types : utils
         return types[static_cast<std::underlying_type_t<value_types>>(t) + 3];
     }
 
+    bool big_int = true;
+    bool big_num = true;
+
+    expr_ref new_boolean(expr_ref num)
+    {
+        return BinaryenRefI31(mod, num);
+    }
+
     expr_ref new_number(expr_ref num)
     {
         return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::number>()));
@@ -163,6 +181,103 @@ struct ext_types : utils
     static BinaryenType integer_type()
     {
         return BinaryenTypeInt64();
+    }
+
+    expr_ref const_boolean(bool literal)
+    {
+        return const_i32(literal);
+    }
+
+    expr_ref const_integer(int64_t literal)
+    {
+        if (big_int)
+            return BinaryenConst(mod, BinaryenLiteralInt64(literal));
+        return BinaryenConst(mod, BinaryenLiteralInt32(literal));
+    }
+
+    expr_ref const_number(double literal)
+    {
+        if (big_num)
+            return BinaryenConst(mod, BinaryenLiteralFloat64(literal));
+        return BinaryenConst(mod, BinaryenLiteralFloat32(literal));
+    }
+
+    expr_ref binop(BinaryenOp op, expr_ref left, expr_ref right)
+    {
+        return BinaryenBinary(mod, op, left, right);
+    }
+
+    expr_ref unop(BinaryenOp op, expr_ref right)
+    {
+        return BinaryenUnary(mod, op, right);
+    }
+
+#define GEN_BINOP_INT(name, big, small)                       \
+    expr_ref name(expr_ref left, expr_ref right)              \
+    {                                                         \
+        return binop(big_int ? big() : small(), left, right); \
+    }
+
+#define GEN_BINOP_NUM(name, big, small)                       \
+    expr_ref name(expr_ref left, expr_ref right)              \
+    {                                                         \
+        return binop(big_num ? big() : small(), left, right); \
+    }
+
+#define GEN_UNNOP_INT(name, big, small)                \
+    expr_ref name(expr_ref right)                      \
+    {                                                  \
+        return unop(big_int ? big() : small(), right); \
+    }
+
+#define GEN_UNOP_NUM(name, big, small)                 \
+    expr_ref name(expr_ref right)                      \
+    {                                                  \
+        return unop(big_num ? big() : small(), right); \
+    }
+
+    GEN_BINOP_INT(mul_int, BinaryenMulInt64, BinaryenMulInt32)
+    GEN_BINOP_INT(add_int, BinaryenAddInt64, BinaryenAddInt32)
+    GEN_BINOP_INT(xor_int, BinaryenXorInt64, BinaryenXorInt32)
+
+    GEN_BINOP_INT(add_num, BinaryenAddFloat64, BinaryenAddFloat32)
+
+    GEN_UNOP_NUM(neg_num, BinaryenNegFloat64, BinaryenNegFloat32)
+
+
+
+    expr_ref int_to_num(expr_ref right)
+    {
+        BinaryenOp op;
+        if (big_num)
+        {
+            if (big_int)
+                op = BinaryenConvertSInt64ToFloat64();
+            else
+                op = BinaryenConvertSInt32ToFloat64();
+        }
+        else
+        {
+            if (big_int)
+                op = BinaryenConvertSInt64ToFloat32();
+            else
+                op = BinaryenConvertSInt32ToFloat32();
+        }
+
+        return unop(op, right);
+    }
+
+
+    expr_ref size_to_integer(expr_ref value)
+    {
+        if (big_int)
+            return unop(BinaryenExtendUInt32(), value);
+        return value;
+    }
+
+    static BinaryenType bool_type()
+    {
+        return BinaryenTypeInt32();
     }
 
     static BinaryenType size_type()
@@ -184,15 +299,43 @@ struct ext_types : utils
 
     std::size_t label_counter = 0;
 
-    template<typename F>
-    auto switch_value(expr_ref exp, const std::vector<std::tuple<const char*, value_types>>& casts, F&& code)
+    static const char* to_string(value_types vtype)
     {
-        auto n = "nil_" + std::to_string(label_counter++);
+        switch (vtype)
+        {
+        case value_types::nil:
+            return "nil";
+        case value_types::boolean:
+            return "boolean";
+        case value_types::integer:
+            return "integer";
+        case value_types::number:
+            return "number";
+        case value_types::string:
+            return "string";
+        case value_types::function:
+            return "function";
+        case value_types::userdata:
+            return "userdata";
+        case value_types::thread:
+            return "thread";
+        case value_types::table:
+            return "table";
+        default:
+            return "";
+        }
+    }
+
+    template<typename F, size_t S>
+    auto switch_value(expr_ref exp, const std::array<value_types, S>& casts, F&& code)
+    {
+        auto n       = "nil" + std::to_string(label_counter++);
+        auto counter = label_counter;
         exp    = BinaryenBrOn(mod, BinaryenBrOnNull(), n.c_str(), exp, BinaryenTypeNone());
 
-        for (auto& [name, vtype] : casts)
+        for (auto vtype : casts)
         {
-            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), name, exp, type(vtype));
+            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), (to_string(vtype) + std::to_string(label_counter++)).c_str(), exp, type(vtype));
         }
 
         expr_ref inner[] = {
@@ -200,9 +343,9 @@ struct ext_types : utils
             code(value_types{-1}, nullptr),
         };
         bool once = false;
-        for (auto& [name, vtype] : casts)
+        for (auto vtype : casts)
         {
-            exp  = BinaryenBlock(mod, name, once ? &exp : std::data(inner), once ? 1 : std::size(inner), BinaryenTypeAuto());
+            exp  = BinaryenBlock(mod, (to_string(vtype) + std::to_string(counter++)).c_str(), once ? &exp : std::data(inner), once ? 1 : std::size(inner), BinaryenTypeAuto());
             exp  = code(vtype, exp);
             once = true;
         }
@@ -211,19 +354,6 @@ struct ext_types : utils
             BinaryenBlock(mod, n.c_str(), &exp, 1, BinaryenTypeAuto()),
             code(value_types::nil, nullptr),
         };
-    }
-
-    expr_ref new_value(expr_ref exp)
-    {
-        auto type = BinaryenExpressionGetType(exp);
-        if (type == number_type())
-            return new_number(exp);
-        else if (type == integer_type())
-            return new_integer(exp);
-        else
-        {
-            return exp;
-        }
     }
 
     BinaryenType ref_array_type() const

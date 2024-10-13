@@ -496,32 +496,46 @@ struct compiler : ext_types
     }
     auto to_bool()
     {
-        std::vector<std::tuple<const char*, value_types>> casts = {
-            {
-                "boolean",
-                value_types::boolean,
-            },
+        auto casts = std::array{
+            value_types::boolean,
         };
 
-        return BinaryenAddFunction(mod,
-                                   "*to_bool",
-                                   anyref(),
-                                   size_type(),
-                                   nullptr,
-                                   0,
-                                   make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
-                                                           {
-                                                               const char* func;
-                                                               switch (type)
-                                                               {
-                                                               case value_types::nil:
-                                                                   return BinaryenReturn(mod, const_i32(0));
-                                                               case value_types::boolean:
-                                                                   return BinaryenReturn(mod, BinaryenI31Get(mod, exp, false));
-                                                               default:
-                                                                   return BinaryenReturn(mod, const_i32(1));
-                                                               }
-                                                           })));
+        BinaryenAddFunction(mod,
+                            "*to_bool",
+                            anyref(),
+                            bool_type(),
+                            nullptr,
+                            0,
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                                                    {
+                                                        switch (type)
+                                                        {
+                                                        case value_types::nil:
+                                                            return make_return(const_i32(0));
+                                                        case value_types::boolean:
+                                                            return make_return(BinaryenI31Get(mod, exp, false));
+                                                        default:
+                                                            return make_return(const_i32(1));
+                                                        }
+                                                    })));
+        BinaryenAddFunction(mod,
+                            "*to_bool_invert",
+                            anyref(),
+                            bool_type(),
+                            nullptr,
+                            0,
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                                                    {
+                                                        switch (type)
+                                                        {
+                                                        case value_types::nil:
+                                                            return make_return(const_i32(1));
+                                                        case value_types::boolean:
+                                                            return make_return(BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenI31Get(mod, exp, false)));
+                                                        default:
+                                                            return make_return(const_i32(0));
+                                                        }
+                                                    })));
     }
     expr_ref_list operator()(const do_statement& p)
     {
@@ -535,7 +549,7 @@ struct compiler : ext_types
         for (auto& [cond_exp, body] : p.cond_block)
         {
             auto cond = (*this)(cond_exp);
-            auto next = make_if(make_call("*to_bool", cond, size_type()), make_block((*this)(body)));
+            auto next = make_if(make_call("*to_bool", cond, bool_type()), make_block((*this)(body)));
             if (last)
                 BinaryenIfSetIfFalse(last, next);
             else
@@ -572,17 +586,17 @@ struct compiler : ext_types
 
     auto operator()(const boolean& p)
     {
-        return const_i32(p.value);
+        return new_boolean(const_boolean(p.value));
     }
 
     auto operator()(const int_type& p)
     {
-        return BinaryenConst(mod, BinaryenLiteralInt64(p));
+        return new_integer(const_integer(p));
     }
 
     auto operator()(const float_type& p)
     {
-        return BinaryenConst(mod, BinaryenLiteralFloat64(p));
+        return new_number(const_number(p));
     }
 
     expr_ref add_string(const std::string& str)
@@ -713,7 +727,7 @@ struct compiler : ext_types
 
         append(body, f());
 
-        body.push_back(BinaryenReturn(mod, null()));
+        body.push_back(make_return(null()));
 
         auto locals = frame.get_local_type_list();
 
@@ -808,10 +822,150 @@ struct compiler : ext_types
     expr_ref_list open_basic_lib();
     expr_ref_list setup_env();
 
+    void make_bin_operation()
+    {
+        BinaryenType p[] = {anyref(), anyref()};
+        auto params      = BinaryenTypeCreate(std::data(p), std::size(p));
+
+        auto vars = std::array<BinaryenType, 0>{};
+
+        BinaryenAddFunction(mod,
+                            "*logic_and",
+                            params,
+                            anyref(),
+                            std::data(vars),
+                            std::size(vars),
+                            make_if(make_call("*to_bool", local_get(0, anyref()), bool_type()), local_get(1, anyref()), local_get(0, anyref())));
+
+        BinaryenAddFunction(mod,
+                            "*logic_or",
+                            params,
+                            anyref(),
+                            std::data(vars),
+                            std::size(vars),
+                            make_if(make_call("*to_bool", local_get(0, anyref()), bool_type()), local_get(0, anyref()), local_get(1, anyref())));
+
+        {
+            auto casts = std::array{
+                value_types::integer,
+                value_types::number,
+            };
+            BinaryenAddFunction(mod,
+                                "*addition",
+                                params,
+                                anyref(),
+                                std::data(vars),
+                                std::size(vars),
+                                make_block(switch_value(local_get(0, anyref()), casts, [&](value_types left_type, expr_ref left)
+                                                        {
+                                                            return make_block(switch_value(local_get(1, anyref()), casts, [&](value_types right_type, expr_ref right)
+                                                                                           {
+                                                                                               switch (left_type)
+                                                                                               {
+                                                                                               case value_types::integer:
+                                                                                                   switch (right_type)
+                                                                                                   {
+                                                                                                   case value_types::integer:
+
+                                                                                                       left  = BinaryenStructGet(mod, 0, left, integer_type(), false);
+                                                                                                       right = BinaryenStructGet(mod, 0, right, integer_type(), false);
+                                                                                                       return make_return(new_integer(add_int(left, right)));
+                                                                                                   case value_types::number:
+                                                                                                       left  = BinaryenStructGet(mod, 0, left, integer_type(), false);
+                                                                                                       left  = int_to_num(left);
+                                                                                                       right = BinaryenStructGet(mod, 0, right, number_type(), false);
+                                                                                                       return make_return(new_number(add_num(left, right)));
+
+                                                                                                   default:
+                                                                                                       return throw_error(add_string("unexpected type"));
+                                                                                                   }
+
+                                                                                               case value_types::number:
+                                                                                                   switch (right_type)
+                                                                                                   {
+                                                                                                   case value_types::integer:
+                                                                                                       left  = BinaryenStructGet(mod, 0, left, number_type(), false);
+                                                                                                       right = BinaryenStructGet(mod, 0, right, integer_type(), false);
+                                                                                                       right = int_to_num(right);
+                                                                                                       return make_return(new_number(add_num(left, right)));
+                                                                                                   case value_types::number:
+                                                                                                       left  = BinaryenStructGet(mod, 0, left, number_type(), false);
+                                                                                                       right = BinaryenStructGet(mod, 0, right, number_type(), false);
+                                                                                                       return make_return(new_number(add_num(left, right)));
+
+                                                                                                   default:
+                                                                                                       return throw_error(add_string("unexpected type"));
+                                                                                                   }
+                                                                                               default:
+                                                                                                   return throw_error(add_string("unexpected type"));
+                                                                                               }
+                                                                                           }));
+                                                        })));
+        }
+    }
+
     // TODO
     auto operator()(const bin_operation& p)
     {
-        auto lhs_type = get_return_type(p.lhs);
+        const char* func = [&]()
+        {
+            switch (p.op)
+            {
+            case bin_operator::addition:
+                return "*addition";
+            case bin_operator::subtraction:
+                return "*subtraction";
+            case bin_operator::multiplication:
+                return "*multiplication";
+            case bin_operator::division:
+                return "*division";
+            case bin_operator::division_floor:
+                return "*division_floor";
+            case bin_operator::exponentiation:
+                return "*exponentiation";
+            case bin_operator::modulo:
+                return "*modulo";
+
+            case bin_operator::logic_and:
+                return "*logic_and";
+            case bin_operator::logic_or:
+                return "*logic_or";
+
+            case bin_operator::binary_or:
+                return "*binary_or";
+            case bin_operator::binary_and:
+                return "*binary_and";
+            case bin_operator::binary_xor:
+                return "*binary_xor";
+            case bin_operator::binary_right_shift:
+                return "*binary_right_shift";
+            case bin_operator::binary_left_shift:
+                return "*binary_left_shift";
+
+            case bin_operator::equality:
+                return "*equality";
+            case bin_operator::inequality:
+                return "*inequality";
+            case bin_operator::less_than:
+                return "*less_than";
+            case bin_operator::greater_than:
+                return "*greater_than";
+            case bin_operator::less_or_equal:
+                return "*less_or_equal";
+            case bin_operator::greater_or_equal:
+                return "*greater_or_equal";
+
+            case bin_operator::concat:
+                return "*concat";
+            default:
+                semantic_error("");
+            }
+        }();
+        auto lhs = (*this)(p.lhs);
+        auto rhs = (*this)(p.rhs);
+        return make_call(func, std::array{lhs, rhs}, anyref());
+
+        /*auto lhs_type = get_return_type(p.lhs);
         auto rhs_type = get_return_type(p.rhs);
         expr_ref result;
 
@@ -870,17 +1024,128 @@ struct compiler : ext_types
             }
         }
 
-        result = BinaryenBinary(mod, op, lhs, rhs);
-        return result;
+        result = BinaryenBinary(mod, op, lhs, rhs);*/
     }
 
-    // TODO
+    void make_un_operation()
+    {
+        auto vars = std::array<BinaryenType, 0>{};
+
+        {
+            BinaryenAddFunction(mod,
+                                "*logic_not",
+                                anyref(),
+                                anyref(),
+                                std::data(vars),
+                                std::size(vars),
+                                BinaryenRefI31(mod, make_call("*to_bool_invert", local_get(0, anyref()), bool_type())));
+        }
+        {
+            auto casts = std::array{
+                value_types::integer,
+                value_types::number,
+            };
+
+            BinaryenAddFunction(mod,
+                                "*binary_not",
+                                anyref(),
+                                anyref(),
+                                std::data(vars),
+                                std::size(vars),
+                                make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                                                        {
+                                                            switch (type)
+                                                            {
+                                                            case value_types::integer:
+                                                                exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
+                                                                return make_return(new_integer(xor_int(const_integer(-1), exp)));
+                                                            case value_types::number:
+                                                                // TODO
+                                                                return make_return(exp);
+                                                            default:
+                                                                return throw_error(add_string("unexpected type"));
+                                                            }
+                                                        })));
+        }
+        {
+            auto casts = std::array{
+                value_types::integer,
+                value_types::number,
+            };
+            BinaryenAddFunction(mod,
+                                "*minus",
+                                anyref(),
+                                anyref(),
+                                std::data(vars),
+                                std::size(vars),
+                                make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                                                        {
+                                                            switch (type)
+                                                            {
+                                                            case value_types::integer:
+                                                                exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
+                                                                return make_return(new_integer(mul_int(const_integer(-1), exp)));
+                                                            case value_types::number:
+                                                                exp = BinaryenStructGet(mod, 0, exp, number_type(), false);
+                                                                return make_return(new_number(neg_num(exp)));
+                                                            default:
+                                                                return throw_error(add_string("unexpected type"));
+                                                            }
+                                                        })));
+        }
+
+        {
+            auto casts = std::array{
+                value_types::string,
+                value_types::table,
+                //value_types::userdata,
+            };
+
+            BinaryenAddFunction(mod,
+                                "*len",
+                                anyref(),
+                                anyref(),
+                                std::data(vars),
+                                std::size(vars),
+                                make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                                                        {
+                                                            switch (type)
+                                                            {
+                                                            case value_types::string:
+                                                                return make_return(new_integer(size_to_integer(array_len(exp))));
+                                                            case value_types::table:
+                                                            case value_types::userdata:
+                                                            {
+                                                                // TODO
+
+                                                                return drop(exp);
+                                                            }
+                                                            default:
+
+                                                                return throw_error(add_string("unexpected type"));
+                                                            }
+                                                        })));
+        }
+        //switch_value
+    }
+
     auto operator()(const un_operation& p)
     {
-        auto rhs_type = get_return_type(p.rhs);
-
         auto rhs = (*this)(p.rhs);
-        return rhs;
+        switch (p.op)
+        {
+        case un_operator::minus:
+            return make_call("*minus", rhs, anyref());
+        case un_operator::logic_not:
+            return make_call("*logic_not", rhs, anyref());
+        case un_operator::len:
+            return make_call("*len", rhs, anyref());
+        case un_operator::binary_not:
+            return make_call("*binary_not", rhs, anyref());
+        default:
+            semantic_error("");
+            break;
+        }
     }
 
     auto operator()(const block& p) -> expr_ref_list
@@ -896,7 +1161,7 @@ struct compiler : ext_types
         if (p.retstat)
         {
             auto list = (*this)(*p.retstat);
-            result.push_back(BinaryenReturn(mod, list));
+            result.push_back(make_return(list));
         }
 
         return result;
@@ -906,6 +1171,8 @@ struct compiler : ext_types
     {
         func_table_get();
         to_bool();
+        make_un_operation();
+        make_bin_operation();
 
         function_frame frame{_func_stack, 0, std::nullopt};
 
@@ -921,7 +1188,8 @@ struct compiler : ext_types
         expr_ref catches[] = {
             make_block(std::array{
                 BinaryenDrop(mod, BinaryenPop(mod, anyref())),
-                BinaryenUnreachable(mod),
+                BinaryenNop(mod),
+                //BinaryenUnreachable(mod),
             })};
 
         auto try_ = BinaryenTry(mod,

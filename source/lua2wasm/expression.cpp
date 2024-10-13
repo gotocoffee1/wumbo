@@ -52,7 +52,7 @@ expr_ref compiler::operator()(const expression_list& p)
             }
         }
         else
-            result.push_back(new_value(exp));
+            result.push_back(exp);
     }
 
     return BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));

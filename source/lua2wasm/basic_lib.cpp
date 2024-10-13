@@ -53,7 +53,7 @@ expr_ref_list compiler::open_basic_lib()
                                                                        nullptr),
                                                      }))),
 
-                                BinaryenReturn(mod, local_get(2, BinaryenTypeExternref())),
+                                make_return(local_get(2, BinaryenTypeExternref())),
                             }));
     }
 
@@ -69,7 +69,7 @@ expr_ref_list compiler::open_basic_lib()
                  auto exp = get_var("f");
                  return std::array{throw_error(get_var("message"))};
              });
-        add_func("pcall", {"f", "arg1"}, true, [this]()
+    add_func("pcall", {"f", "arg1"}, true, [this]()
              {
                  auto exp = get_var("f");
                  return std::array{throw_error(get_var("message"))};
@@ -94,23 +94,11 @@ expr_ref_list compiler::open_basic_lib()
 
                  exp = array_get(exp, const_i32(0), anyref());
 
-                 std::vector<std::tuple<const char*, value_types>> casts = {
-                     //{
-                     //    "boolean",
+                 auto casts = std::array{
                      //    value_types::boolean,
-                     //},
-                     {
-                         "number",
-                         value_types::number,
-                     },
-                     {
-                         "integer",
-                         value_types::integer,
-                     },
-                     {
-                         "string",
-                         value_types::string,
-                     },
+                     value_types::number,
+                     value_types::integer,
+                     value_types::string,
                  };
 
                  auto s = [&](value_types type, expr_ref exp)
@@ -149,10 +137,9 @@ expr_ref_list compiler::open_basic_lib()
                          return BinaryenUnreachable(mod);
                      }
                      return make_block(std::array{
-                         BinaryenCall(mod, func, &exp, 1, BinaryenTypeNone()),
-                         BinaryenReturn(mod, null()),
+                         make_call(func, exp, BinaryenTypeNone()),
+                         make_return(null()),
                      });
-                     //return BinaryenReturnCall(mod, func, &exp, 1, BinaryenTypeNone());
                  };
 
                  return switch_value(exp, casts, s);
