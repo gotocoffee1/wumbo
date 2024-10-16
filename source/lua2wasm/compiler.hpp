@@ -850,57 +850,81 @@ struct compiler : ext_types
                 value_types::integer,
                 value_types::number,
             };
-            BinaryenAddFunction(mod,
-                                "*addition",
-                                params,
-                                anyref(),
-                                std::data(vars),
-                                std::size(vars),
-                                make_block(switch_value(local_get(0, anyref()), casts, [&](value_types left_type, expr_ref left)
-                                                        {
-                                                            return make_block(switch_value(local_get(1, anyref()), casts, [&](value_types right_type, expr_ref right)
-                                                                                           {
-                                                                                               switch (left_type)
-                                                                                               {
-                                                                                               case value_types::integer:
-                                                                                                   switch (right_type)
-                                                                                                   {
-                                                                                                   case value_types::integer:
 
-                                                                                                       left  = BinaryenStructGet(mod, 0, left, integer_type(), false);
-                                                                                                       right = BinaryenStructGet(mod, 0, right, integer_type(), false);
-                                                                                                       return make_return(new_integer(add_int(left, right)));
-                                                                                                   case value_types::number:
-                                                                                                       left  = BinaryenStructGet(mod, 0, left, integer_type(), false);
-                                                                                                       left  = int_to_num(left);
-                                                                                                       right = BinaryenStructGet(mod, 0, right, number_type(), false);
-                                                                                                       return make_return(new_number(add_num(left, right)));
+            auto functions = std::array{
+                "*addition",
+                "*subtraction",
+                "*multiplication",
+                "*division",
+            };
+            for (auto& function : functions)
+            {
+                BinaryenAddFunction(mod,
+                                    function,
+                                    params,
+                                    anyref(),
+                                    std::data(vars),
+                                    std::size(vars),
+                                    make_block(switch_value(local_get(0, anyref()), casts, [&](value_types left_type, expr_ref left)
+                                                            {
+                                                                if (std::find(std::begin(casts), std::end(casts), left_type) == std::end(casts))
+                                                                    return throw_error(add_string("unexpected type"));
 
-                                                                                                   default:
-                                                                                                       return throw_error(add_string("unexpected type"));
-                                                                                                   }
+                                                                auto func_name = std::string{function} + to_string(left_type);
 
-                                                                                               case value_types::number:
-                                                                                                   switch (right_type)
-                                                                                                   {
-                                                                                                   case value_types::integer:
-                                                                                                       left  = BinaryenStructGet(mod, 0, left, number_type(), false);
-                                                                                                       right = BinaryenStructGet(mod, 0, right, integer_type(), false);
-                                                                                                       right = int_to_num(right);
-                                                                                                       return make_return(new_number(add_num(left, right)));
-                                                                                                   case value_types::number:
-                                                                                                       left  = BinaryenStructGet(mod, 0, left, number_type(), false);
-                                                                                                       right = BinaryenStructGet(mod, 0, right, number_type(), false);
-                                                                                                       return make_return(new_number(add_num(left, right)));
+                                                                auto p = std::array{type(left_type), anyref()};
 
-                                                                                                   default:
-                                                                                                       return throw_error(add_string("unexpected type"));
-                                                                                                   }
-                                                                                               default:
-                                                                                                   return throw_error(add_string("unexpected type"));
-                                                                                               }
-                                                                                           }));
-                                                        })));
+                                                                auto params = BinaryenTypeCreate(std::data(p), std::size(p));
+
+                                                                BinaryenAddFunction(mod,
+                                                                                    func_name.c_str(),
+                                                                                    params,
+                                                                                    anyref(),
+                                                                                    std::data(vars),
+                                                                                    std::size(vars),
+                                                                                    make_block(switch_value(local_get(1, anyref()), casts, [&](value_types right_type, expr_ref right)
+                                                                                                            {
+                                                                                                                auto left = local_get(0, type(left_type));
+                                                                                                                switch (left_type)
+                                                                                                                {
+                                                                                                                case value_types::integer:
+                                                                                                                    left  = BinaryenStructGet(mod, 0, left, integer_type(), false);
+                                                                                                                    switch (right_type)
+                                                                                                                    {
+                                                                                                                    case value_types::integer:
+                                                                                                                        right = BinaryenStructGet(mod, 0, right, integer_type(), false);
+                                                                                                                        return make_return(new_integer(add_int(left, right)));
+                                                                                                                    case value_types::number:
+                                                                                                                        left  = int_to_num(left);
+                                                                                                                        right = BinaryenStructGet(mod, 0, right, number_type(), false);
+                                                                                                                        return make_return(new_number(add_num(left, right)));
+                                                                                                                    default:
+                                                                                                                        throw_error(add_string("unexpected type"));
+                                                                                                                    }
+
+                                                                                                                case value_types::number:
+                                                                                                                    left  = BinaryenStructGet(mod, 0, left, number_type(), false);
+                                                                                                                    switch (right_type)
+                                                                                                                    {
+                                                                                                                    case value_types::integer:
+                                                                                                                        right = BinaryenStructGet(mod, 0, right, integer_type(), false);
+                                                                                                                        right = int_to_num(right);
+                                                                                                                        return make_return(new_number(add_num(left, right)));
+                                                                                                                    case value_types::number:
+                                                                                                                        right = BinaryenStructGet(mod, 0, right, number_type(), false);
+                                                                                                                        return make_return(new_number(add_num(left, right)));
+                                                                                                                    default:
+                                                                                                                        return throw_error(add_string("unexpected type"));
+                                                                                                                    }
+                                                                                                                default:
+                                                                                                                    semantic_error("unreachable");
+                                                                                                                }
+                                                                                                            })));
+
+                                                                auto args = std::array{left, local_get(1, anyref())};
+                                                                return BinaryenReturnCall(mod, func_name.c_str(), std::data(args), std::size(args), anyref());
+                                                            })));
+            }
         }
     }
 

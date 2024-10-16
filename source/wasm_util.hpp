@@ -238,9 +238,14 @@ struct ext_types : utils
 
     GEN_BINOP_INT(mul_int, BinaryenMulInt64, BinaryenMulInt32)
     GEN_BINOP_INT(add_int, BinaryenAddInt64, BinaryenAddInt32)
+    GEN_BINOP_INT(sub_int, BinaryenSubInt64, BinaryenSubInt32)
+    GEN_BINOP_INT(div_int, BinaryenDivSInt64, BinaryenDivSInt32)
     GEN_BINOP_INT(xor_int, BinaryenXorInt64, BinaryenXorInt32)
 
     GEN_BINOP_INT(add_num, BinaryenAddFloat64, BinaryenAddFloat32)
+    GEN_BINOP_INT(mul_num, BinaryenMulFloat64, BinaryenMulFloat32)
+    GEN_BINOP_INT(sub_num, BinaryenSubFloat64, BinaryenSubFloat32)
+    GEN_BINOP_INT(div_num, BinaryenDivFloat64, BinaryenDivFloat32)
 
     GEN_UNOP_NUM(neg_num, BinaryenNegFloat64, BinaryenNegFloat32)
 
@@ -339,7 +344,7 @@ struct ext_types : utils
         }
 
         expr_ref inner[] = {
-            BinaryenDrop(mod, exp),
+            drop(exp),
             code(value_types{-1}, nullptr),
         };
         bool once = false;
