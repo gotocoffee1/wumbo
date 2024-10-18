@@ -240,16 +240,32 @@ struct ext_types : utils
     GEN_BINOP_INT(add_int, BinaryenAddInt64, BinaryenAddInt32)
     GEN_BINOP_INT(sub_int, BinaryenSubInt64, BinaryenSubInt32)
     GEN_BINOP_INT(div_int, BinaryenDivSInt64, BinaryenDivSInt32)
+    GEN_BINOP_INT(rem_int, BinaryenRemSInt64, BinaryenRemSInt32)
     GEN_BINOP_INT(xor_int, BinaryenXorInt64, BinaryenXorInt32)
+    GEN_BINOP_INT(or_int, BinaryenOrInt64, BinaryenOrInt32)
+    GEN_BINOP_INT(and_int, BinaryenAndInt64, BinaryenAndInt32)
+    GEN_BINOP_INT(shr_int, BinaryenShrSInt64, BinaryenShrSInt32)
+    GEN_BINOP_INT(shl_int, BinaryenShlInt64, BinaryenShlInt32)
+    GEN_BINOP_INT(eq_int, BinaryenEqInt64, BinaryenEqInt32)
+    GEN_BINOP_INT(ne_int, BinaryenNeInt64, BinaryenNeInt32)
+    GEN_BINOP_INT(gt_int, BinaryenGtSInt64, BinaryenGtSInt32)
+    GEN_BINOP_INT(lt_int, BinaryenLtSInt64, BinaryenLtSInt32)
+    GEN_BINOP_INT(le_int, BinaryenLeSInt64, BinaryenLeSInt32)
+    GEN_BINOP_INT(ge_int, BinaryenGeSInt64, BinaryenGeSInt32)
 
     GEN_BINOP_INT(add_num, BinaryenAddFloat64, BinaryenAddFloat32)
     GEN_BINOP_INT(mul_num, BinaryenMulFloat64, BinaryenMulFloat32)
     GEN_BINOP_INT(sub_num, BinaryenSubFloat64, BinaryenSubFloat32)
     GEN_BINOP_INT(div_num, BinaryenDivFloat64, BinaryenDivFloat32)
+    GEN_BINOP_INT(eq_num, BinaryenEqFloat64, BinaryenEqFloat32)
+    GEN_BINOP_INT(ne_num, BinaryenNeFloat64, BinaryenNeFloat32)
+    GEN_BINOP_INT(gt_num, BinaryenGtFloat64, BinaryenGtFloat32)
+    GEN_BINOP_INT(lt_num, BinaryenLtFloat64, BinaryenLtFloat32)
+    GEN_BINOP_INT(le_num, BinaryenLeFloat64, BinaryenLeFloat32)
+    GEN_BINOP_INT(ge_num, BinaryenGeFloat64, BinaryenGeFloat32)
+
 
     GEN_UNOP_NUM(neg_num, BinaryenNegFloat64, BinaryenNegFloat32)
-
-
 
     expr_ref int_to_num(expr_ref right)
     {
@@ -271,7 +287,6 @@ struct ext_types : utils
 
         return unop(op, right);
     }
-
 
     expr_ref size_to_integer(expr_ref value)
     {
@@ -336,7 +351,7 @@ struct ext_types : utils
     {
         auto n       = "nil" + std::to_string(label_counter++);
         auto counter = label_counter;
-        exp    = BinaryenBrOn(mod, BinaryenBrOnNull(), n.c_str(), exp, BinaryenTypeNone());
+        exp          = BinaryenBrOn(mod, BinaryenBrOnNull(), n.c_str(), exp, BinaryenTypeNone());
 
         for (auto vtype : casts)
         {

@@ -829,22 +829,6 @@ struct compiler : ext_types
 
         auto vars = std::array<BinaryenType, 0>{};
 
-        BinaryenAddFunction(mod,
-                            "*logic_and",
-                            params,
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_if(make_call("*to_bool", local_get(0, anyref()), bool_type()), local_get(1, anyref()), local_get(0, anyref())));
-
-        BinaryenAddFunction(mod,
-                            "*logic_or",
-                            params,
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_if(make_call("*to_bool", local_get(0, anyref()), bool_type()), local_get(0, anyref()), local_get(1, anyref())));
-
         {
             auto casts = std::array{
                 value_types::integer,
@@ -852,12 +836,23 @@ struct compiler : ext_types
             };
 
             auto functions = std::array{
-                "*addition",
-                "*subtraction",
-                "*multiplication",
-                "*division",
+                std::tuple{"*addition", &compiler::add_int, &compiler::add_num},
+                std::tuple{"*subtraction", &compiler::sub_int, &compiler::sub_num},
+                std::tuple{"*multiplication", &compiler::mul_int, &compiler::mul_num},
+                std::tuple{"*division", &compiler::div_int, &compiler::div_num},
+                std::tuple{"*division_floor", &compiler::div_int, &compiler::div_num},
+                std::tuple{"*exponentiation", &compiler::div_int, &compiler::div_num},
+                std::tuple{"*modulo", &compiler::rem_int, &compiler::div_num},
             };
-            for (auto& function : functions)
+
+            auto bitop = std::array{
+                std::tuple{"*binary_or", &compiler::or_int},
+                std::tuple{"*binary_and", &compiler::and_int},
+                std::tuple{"*binary_xor", &compiler::xor_int},
+                std::tuple{"*binary_right_shift", &compiler::shr_int},
+                std::tuple{"*binary_left_shift", &compiler::shl_int},
+            };
+            for (auto& [function, int_op, num_op] : functions)
             {
                 BinaryenAddFunction(mod,
                                     function,
@@ -885,34 +880,35 @@ struct compiler : ext_types
                                                                                     make_block(switch_value(local_get(1, anyref()), casts, [&](value_types right_type, expr_ref right)
                                                                                                             {
                                                                                                                 auto left = local_get(0, type(left_type));
+
                                                                                                                 switch (left_type)
                                                                                                                 {
                                                                                                                 case value_types::integer:
-                                                                                                                    left  = BinaryenStructGet(mod, 0, left, integer_type(), false);
+                                                                                                                    left = BinaryenStructGet(mod, 0, left, integer_type(), false);
                                                                                                                     switch (right_type)
                                                                                                                     {
                                                                                                                     case value_types::integer:
                                                                                                                         right = BinaryenStructGet(mod, 0, right, integer_type(), false);
-                                                                                                                        return make_return(new_integer(add_int(left, right)));
+                                                                                                                        return make_return(new_integer(std::invoke(int_op, this, left, right)));
                                                                                                                     case value_types::number:
                                                                                                                         left  = int_to_num(left);
                                                                                                                         right = BinaryenStructGet(mod, 0, right, number_type(), false);
-                                                                                                                        return make_return(new_number(add_num(left, right)));
+                                                                                                                        return make_return(new_number(std::invoke(num_op, this, left, right)));
                                                                                                                     default:
-                                                                                                                        throw_error(add_string("unexpected type"));
+                                                                                                                        return throw_error(add_string("unexpected type"));
                                                                                                                     }
 
                                                                                                                 case value_types::number:
-                                                                                                                    left  = BinaryenStructGet(mod, 0, left, number_type(), false);
+                                                                                                                    left = BinaryenStructGet(mod, 0, left, number_type(), false);
                                                                                                                     switch (right_type)
                                                                                                                     {
                                                                                                                     case value_types::integer:
                                                                                                                         right = BinaryenStructGet(mod, 0, right, integer_type(), false);
                                                                                                                         right = int_to_num(right);
-                                                                                                                        return make_return(new_number(add_num(left, right)));
+                                                                                                                        return make_return(new_number(std::invoke(num_op, this, left, right)));
                                                                                                                     case value_types::number:
                                                                                                                         right = BinaryenStructGet(mod, 0, right, number_type(), false);
-                                                                                                                        return make_return(new_number(add_num(left, right)));
+                                                                                                                        return make_return(new_number(std::invoke(num_op, this, left, right)));
                                                                                                                     default:
                                                                                                                         return throw_error(add_string("unexpected type"));
                                                                                                                     }
@@ -931,6 +927,24 @@ struct compiler : ext_types
     // TODO
     auto operator()(const bin_operation& p)
     {
+        auto lhs = (*this)(p.lhs);
+        auto rhs = (*this)(p.rhs);
+
+        switch (p.op)
+        {
+        case bin_operator::logic_and:
+        {
+            auto left = help_var_scope{_func_stack, anyref()};
+            return make_if(make_call("*to_bool", local_tee(left, lhs, anyref()), bool_type()), rhs, local_get(left, anyref()));
+        }
+
+        case bin_operator::logic_or:
+        {
+            auto left = help_var_scope{_func_stack, anyref()};
+            return make_if(make_call("*to_bool", local_tee(left, lhs, anyref()), bool_type()), local_get(left, anyref()), rhs);
+        }
+        };
+
         const char* func = [&]()
         {
             switch (p.op)
@@ -949,11 +963,6 @@ struct compiler : ext_types
                 return "*exponentiation";
             case bin_operator::modulo:
                 return "*modulo";
-
-            case bin_operator::logic_and:
-                return "*logic_and";
-            case bin_operator::logic_or:
-                return "*logic_or";
 
             case bin_operator::binary_or:
                 return "*binary_or";
@@ -985,8 +994,7 @@ struct compiler : ext_types
                 semantic_error("");
             }
         }();
-        auto lhs = (*this)(p.lhs);
-        auto rhs = (*this)(p.rhs);
+
         return make_call(func, std::array{lhs, rhs}, anyref());
 
         /*auto lhs_type = get_return_type(p.lhs);
