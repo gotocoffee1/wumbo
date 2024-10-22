@@ -466,10 +466,10 @@ struct compiler : ext_types
     expr_ref _varhead(const varhead& v);
 
     expr_ref _varhead_set(const varhead& v, expr_ref value);
-    expr_ref at_or_null(size_t array, size_t index)
+    expr_ref at_or_null(size_t array, size_t index, expr_ref value = nullptr)
     {
         return BinaryenIf(mod,
-                          BinaryenRefIsNull(mod, local_get(array, ref_array_type())),
+                          BinaryenRefIsNull(mod, value ? local_tee(array, value, ref_array_type()) : local_get(array, ref_array_type())),
                           null(),
                           BinaryenIf(mod,
                                      BinaryenBinary(mod, BinaryenGtUInt32(), BinaryenArrayLen(mod, local_get(array, ref_array_type())), const_i32(index)),

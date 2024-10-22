@@ -228,6 +228,16 @@ expr_ref compiler::operator()(const bin_operation& p)
     auto lhs = (*this)(p.lhs);
     auto rhs = (*this)(p.rhs);
 
+    if (BinaryenExpressionGetType(lhs) == ref_array_type())
+    {
+        auto local = help_var_scope{_func_stack, ref_array_type()};
+        lhs        = at_or_null(local, 0, lhs);
+    }
+    if (BinaryenExpressionGetType(rhs) == ref_array_type())
+    {
+        auto local = help_var_scope{_func_stack, ref_array_type()};
+        rhs        = at_or_null(local, 0, rhs);
+    }
     switch (p.op)
     {
     case bin_operator::logic_and:
@@ -294,67 +304,6 @@ expr_ref compiler::operator()(const bin_operation& p)
     }();
 
     return make_call(func, std::array{lhs, rhs}, anyref());
-
-    /*auto lhs_type = get_return_type(p.lhs);
-        auto rhs_type = get_return_type(p.rhs);
-        expr_ref result;
-
-        auto lhs = (*this)(p.lhs);
-        auto rhs = (*this)(p.rhs);
-
-        BinaryenOp op;
-
-        if (lhs_type == value_types::integer && rhs_type == value_types::integer)
-        {
-            switch (p.op)
-            {
-            case bin_operator::addition:
-                op = BinaryenAddInt64();
-                break;
-            case bin_operator::subtraction:
-                op = BinaryenSubInt64();
-                break;
-            case bin_operator::multiplication:
-                op = BinaryenMulInt64();
-                break;
-            case bin_operator::division:
-                op = BinaryenDivSInt64();
-                break;
-            default:
-                break;
-            }
-        }
-        else if (lhs_type == value_types::number || rhs_type == value_types::number)
-        {
-            switch (p.op)
-            {
-            case bin_operator::addition:
-                op = BinaryenAddFloat64();
-                break;
-            case bin_operator::subtraction:
-                op = BinaryenSubFloat64();
-                break;
-            case bin_operator::multiplication:
-                op = BinaryenMulFloat64();
-                break;
-            case bin_operator::division:
-                op = BinaryenDivFloat64();
-                break;
-            default:
-                break;
-            }
-
-            if (lhs_type == value_types::integer)
-            {
-                lhs = BinaryenUnary(mod, BinaryenConvertSInt64ToFloat64(), lhs);
-            }
-            else if (lhs_type == value_types::number)
-            {
-                rhs = BinaryenUnary(mod, BinaryenConvertSInt64ToFloat64(), rhs);
-            }
-        }
-
-        result = BinaryenBinary(mod, op, lhs, rhs);*/
 }
 
 void compiler::make_un_operation()
@@ -461,6 +410,12 @@ void compiler::make_un_operation()
 expr_ref compiler::operator()(const un_operation& p)
 {
     auto rhs = (*this)(p.rhs);
+
+    if (BinaryenExpressionGetType(rhs) == ref_array_type())
+    {
+        auto local = help_var_scope{_func_stack, ref_array_type()};
+        rhs        = at_or_null(local, 0, rhs);
+    }
     switch (p.op)
     {
     case un_operator::minus:
