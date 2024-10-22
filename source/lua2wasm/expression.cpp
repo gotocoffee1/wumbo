@@ -2,16 +2,15 @@
 
 namespace wumbo
 {
-expr_ref compiler::operator()(const expression_list& p)
+expr_ref compiler::operator()(const expr_ref_list& p)
 {
     if (p.empty())
         return null();
     expr_ref_list result;
     size_t i = 0;
-    for (auto& e : p)
+    for (auto exp : p)
     {
         i++;
-        auto exp  = (*this)(e);
         auto type = BinaryenExpressionGetType(exp);
         if (type == ref_array_type())
         {
@@ -56,6 +55,15 @@ expr_ref compiler::operator()(const expression_list& p)
     }
 
     return BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
+}
+
+expr_ref compiler::operator()(const expression_list& p)
+{
+    expr_ref_list list;
+
+    for (auto& e : p)
+        list.push_back((*this)(e));
+    return (*this)(list);
 }
 
 expr_ref compiler::operator()(const expression& p)

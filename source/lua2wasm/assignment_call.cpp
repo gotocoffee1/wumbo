@@ -5,19 +5,46 @@ namespace wumbo
 
 expr_ref compiler::call(expr_ref func, expr_ref args)
 {
-    auto t = type<value_types::function>();
+    if (!BinaryenGetFunction(mod, "*invoke"))
+    {
+        auto casts = std::array{
+            value_types::function,
+        };
+        auto params = std::array{anyref(), ref_array_type()};
+        auto vars   = std::array{type<value_types::function>()};
+        BinaryenAddFunction(mod,
+                            "*invoke",
+                            BinaryenTypeCreate(std::data(params), std::size(params)),
+                            ref_array_type(),
+                            std::data(vars),
+                            std::size(vars),
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types exp_type, expr_ref exp)
+                                                    {
+                                                        switch (exp_type)
+                                                        {
+                                                        case value_types::function:
+                                                        {
+                                                            auto t     = type<value_types::function>();
+                                                            auto local = 2;
 
-    auto local = help_var_scope{_func_stack, t};
+                                                            auto func_ref = BinaryenStructGet(mod, 0, local_get(local, t), BinaryenTypeFuncref(), false);
+                                                            auto upvalues = BinaryenStructGet(mod, 1, local_tee(local, exp, t), ref_array_type(), false);
 
-    auto func_ref = BinaryenStructGet(mod, 0, local_get(local, t), BinaryenTypeFuncref(), false);
-    auto upvalues = BinaryenStructGet(mod, 1, local_tee(local, func, t), ref_array_type(), false);
+                                                            expr_ref real_args[2];
 
-    expr_ref real_args[2];
+                                                            real_args[upvalue_index] = upvalues;
+                                                            real_args[args_index]    = local_get(1, ref_array_type());
+                                                            return BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), true);
+                                                        }
 
-    real_args[upvalue_index] = upvalues;
-    real_args[args_index]    = args;
+                                                        default:
+                                                            return throw_error(add_string("not a function"));
+                                                        }
+                                                    })));
+    }
+    auto bundle_args = std::array{func, args};
 
-    return BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), false);
+    return make_call("*invoke", bundle_args, ref_array_type());
 }
 
 expr_ref compiler::_funchead(const funchead& p)
@@ -37,11 +64,8 @@ expr_ref compiler::_funchead(const funchead& p)
 
 expr_ref compiler::_functail(const functail& p, expr_ref function)
 {
-    auto t = type<value_types::function>();
-
     auto args = (*this)(p.args);
-
-    return call(BinaryenRefCast(mod, function, t), args);
+    return call(function, args);
 }
 
 expr_ref compiler::_vartail(const vartail& p, expr_ref var)
@@ -150,7 +174,7 @@ expr_ref_list compiler::operator()(const function_call& p)
 
         exp = _functail(functail, exp);
     }
-    return expr_ref_list{BinaryenDrop(mod, exp)};
+    return expr_ref_list{drop(exp)};
 }
 
 expr_ref compiler::operator()(const prefixexp& p)

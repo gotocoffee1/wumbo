@@ -69,10 +69,32 @@ expr_ref_list compiler::open_basic_lib()
                  auto exp = get_var("f");
                  return std::array{throw_error(get_var("message"))};
              });
-    add_func("pcall", {"f", "arg1"}, true, [this]()
+    add_func("pcall", {"f"}, true, [this]()
              {
-                 auto exp = get_var("f");
-                 return std::array{throw_error(get_var("message"))};
+                 auto f = get_var("f");
+
+                 auto args = (*this)(ellipsis{});
+
+                 auto exception = help_var_scope{_func_stack, anyref()};
+
+                 const char* tags[] = {error_tag};
+                 expr_ref catches[] = {
+                     make_block(std::array{
+                         local_set(exception, BinaryenPop(mod, anyref())),
+                         make_return((*this)(std::vector{new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                     }),
+                 };
+
+                 auto try_ = BinaryenTry(mod,
+                                         nullptr,
+                                         make_return((*this)(std::vector{new_boolean(const_boolean(true)), call(f, args)})),
+                                         std::data(tags),
+                                         std::size(tags),
+                                         std::data(catches),
+                                         std::size(catches),
+                                         nullptr);
+
+                 return std::array{try_};
              });
 
     add_func("assert", {"v", "message"}, false, [this]()

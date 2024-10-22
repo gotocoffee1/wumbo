@@ -10,10 +10,10 @@ expr_ref_list compiler::operator()(const local_function& p)
 
     auto func = add_func_ref(p.name.c_str(), p.body);
 
-    return {local_set(index,
-                      is_upvalue
-                          ? BinaryenStructNew(mod, &func, 1, BinaryenTypeGetHeapType(upvalue_type()))
-                          : func)};
+    if (is_upvalue)
+        return {BinaryenStructSet(mod, 0, local_tee(index, BinaryenStructNew(mod, nullptr, 0, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()), func)};
+
+    return {local_set(index, func)};
 }
 
 expr_ref_list compiler::operator()(const local_variables& p)

@@ -264,7 +264,6 @@ struct ext_types : utils
     GEN_BINOP_INT(le_num, BinaryenLeFloat64, BinaryenLeFloat32)
     GEN_BINOP_INT(ge_num, BinaryenGeFloat64, BinaryenGeFloat32)
 
-
     GEN_UNOP_NUM(neg_num, BinaryenNegFloat64, BinaryenNegFloat32)
 
     expr_ref int_to_num(expr_ref right)
