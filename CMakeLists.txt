@@ -33,7 +33,7 @@ include(FetchContent)
 FetchContent_Declare(
   binaryen 
   GIT_REPOSITORY https://github.com/WebAssembly/binaryen
-  GIT_TAG 37a86d558994415e722e7f62f5784b1a8b8b4832
+  GIT_TAG dcc70bbfb16c2f8fce29dad94d80d1b78123655f
 )
 
 FetchContent_MakeAvailable(binaryen)

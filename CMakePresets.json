@@ -1,5 +1,5 @@
 {
-  "version": 2,
+  "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
     "minor": 14,
@@ -7,26 +7,9 @@
   },
   "configurePresets": [
     {
-      "name": "dev-mode",
-      "hidden": true,
-      "cacheVariables": {
-        "tabula-rasa_DEVELOPER_MODE": "ON",
-        "VCPKG_MANIFEST_FEATURES": "test"
-      }
-    },
-    {
       "name": "vcpkg",
       "hidden": true,
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      }
-    },
-    {
-      "name": "vcpkg-win64-static",
-      "hidden": true,
-      "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
-      }
+      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
     },
     {
       "name": "cppcheck",
@@ -43,7 +26,7 @@
       }
     },
     {
-      "name": "ci-std",
+      "name": "std",
       "description": "This preset makes sure the project actually builds with at least the specified standard",
       "hidden": true,
       "cacheVariables": {
@@ -78,80 +61,50 @@
       }
     },
     {
-      "name": "ci-linux",
-      "generator": "Ninja Multi-Config",
+      "name": "wasm32-emscripten",
       "hidden": true,
-      "inherits": [ "flags-linux", "ci-std" ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten"
       }
     },
     {
-      "name": "ci-darwin",
-      "generator": "Ninja Multi-Config",
+      "name": "x64-linux",
       "hidden": true,
-      "inherits": [ "flags-darwin", "ci-std" ],
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
       }
     },
     {
-      "name": "ci-win64",
-      "inherits": [ "flags-windows", "ci-std" ],
-      "generator": "Ninja Multi-Config",
+      "name": "x64-windows",
+      "hidden": true,
       "architecture": {
         "strategy": "external",
         "value": "x64"
       },
-      "hidden": true
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
     },
     {
-      "name": "coverage-linux",
-      "binaryDir": "${sourceDir}/build/coverage",
-      "inherits": "ci-linux",
+      "name": "common",
+      "generator": "Ninja Multi-Config",
+      "binaryDir": "${sourceDir}/build/${presetName}",
       "hidden": true,
-      "cacheVariables": {
-        "ENABLE_COVERAGE": "ON",
-        "CMAKE_BUILD_TYPE": "Coverage",
-        "CMAKE_CXX_FLAGS_COVERAGE": "-Og -g --coverage -fkeep-inline-functions -fkeep-static-functions",
-        "CMAKE_EXE_LINKER_FLAGS_COVERAGE": "--coverage",
-        "CMAKE_SHARED_LINKER_FLAGS_COVERAGE": "--coverage",
-        "CMAKE_MAP_IMPORTED_CONFIG_COVERAGE": "Coverage;RelWithDebInfo;Release;Debug;"
-      }
-    },
-    {
-      "name": "ci-coverage",
-      "inherits": ["coverage-linux", "dev-mode", "vcpkg"],
-      "cacheVariables": {
-        "COVERAGE_HTML_COMMAND": ""
-      }
-    },
-    {
-      "name": "ci-sanitize",
-      "binaryDir": "${sourceDir}/build/sanitize",
-      "inherits": ["ci-linux", "dev-mode", "vcpkg"],
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Sanitize",
-        "CMAKE_CXX_FLAGS_SANITIZE": "-O2 -g -fsanitize=address,undefined -fno-omit-frame-pointer -fno-common",
-        "CMAKE_MAP_IMPORTED_CONFIG_SANITIZE": "Sanitize;RelWithDebInfo;Release;Debug;"
-      }
-    },
-    {
-      "name": "ci-build",
-      "binaryDir": "${sourceDir}/build",
-      "hidden": true
-    },
-    {
-      "name": "ci-macos",
-      "inherits": ["ci-build", "ci-darwin", "dev-mode", "vcpkg"]
-    },
-    {
-      "name": "ci-ubuntu",
-      "inherits": ["ci-build", "ci-linux", "clang-tidy", "vcpkg", "cppcheck", "dev-mode"]
-    },
-    {
-      "name": "ci-windows",
-      "inherits": ["ci-build", "ci-win64", "dev-mode", "vcpkg", "vcpkg-win64-static"]
+      "inherits": [
+        "std",
+        "vcpkg"
+      ]
     }
   ]
 }
