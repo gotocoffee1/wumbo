@@ -47,8 +47,12 @@ struct parse_num
     {
         auto sv = in.string_view();
         sv.remove_prefix(Prefix);
+#ifndef __clang__
         auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), num, ParseMode);
         return ec == std::errc{};
+#else
+        return true;
+#endif //  __clang__
     }
 };
 // clang-format off

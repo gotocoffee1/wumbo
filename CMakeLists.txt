@@ -11,8 +11,21 @@ project(
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 
-add_executable(wumbo source/main.cpp "source/parser.cpp" "source/lua2wasm.cpp" "source/wasm.cpp" "source/lua2wasm/locals.cpp" "source/lua2wasm/assignment_call.cpp" "source/lua2wasm/expression.cpp" "source/lua2wasm/table.cpp" "source/lua2wasm/loop.cpp" "source/lua2wasm/basic_lib.cpp" "source/lua2wasm/operators.cpp")
-add_executable(wumbo::wumbo ALIAS wumbo)
+
+
+add_library(wumbo
+  "source/parser.cpp"
+  "source/lua2wasm.cpp"
+  "source/wasm.cpp"
+  "source/lua2wasm/locals.cpp"
+  "source/lua2wasm/assignment_call.cpp"
+  "source/lua2wasm/expression.cpp"
+  "source/lua2wasm/table.cpp"
+  "source/lua2wasm/loop.cpp"
+  "source/lua2wasm/basic_lib.cpp"
+  "source/lua2wasm/operators.cpp")
+
+add_library(wumbo::wumbo ALIAS wumbo)
 
 find_package(CLI11 CONFIG REQUIRED)
 find_package(pegtl REQUIRED)
@@ -36,8 +49,13 @@ FetchContent_Declare(
   GIT_TAG dcc70bbfb16c2f8fce29dad94d80d1b78123655f
 )
 
-FetchContent_MakeAvailable(binaryen)
 
+FetchContent_GetProperties(binaryen)
+if(NOT binaryen_POPULATED)
+  FetchContent_Populate(binaryen)
+
+  add_subdirectory(${binaryen_SOURCE_DIR} ${binaryen_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
 
 
 set(CMAKE_CXX_FLAGS ${temp})
@@ -46,15 +64,34 @@ set(CMAKE_C_FLAGS ${temp2})
 target_compile_features(wumbo PUBLIC cxx_std_17)
 
 target_link_libraries(wumbo
-  PUBLIC
-  CLI11::CLI11
+  PRIVATE
   taocpp::pegtl
   binaryen)
 
-target_include_directories(wumbo PUBLIC ${binaryen_SOURCE_DIR}/src)
-
-
+target_include_directories(wumbo PRIVATE ${binaryen_SOURCE_DIR}/src)
 target_include_directories(wumbo PRIVATE source)
+
+
+add_executable(wumbo_exe source/main.cpp)
+target_link_libraries(wumbo_exe PUBLIC wumbo)
+
+if (EMSCRIPTEN)
+  target_compile_options(wumbo PUBLIC
+  -fexceptions)
+  target_link_options(wumbo PUBLIC
+  #"SHELL:-s STANDALONE_WASM"
+  #"SHELL:-s ASSERTIONS=2"
+  #"SHELL:-s ALLOW_MEMORY_GROWTH"
+  -fexceptions)
+else()
+  target_link_libraries(wumbo_exe PUBLIC CLI11::CLI11)
+endif()
+
+set_target_properties(
+  wumbo_exe
+  PROPERTIES
+  EXPORT_NAME wumbo
+  OUTPUT_NAME wumbo)
 
 # ---- Install rules ----
 if(NOT CMAKE_SKIP_INSTALL_RULES)
