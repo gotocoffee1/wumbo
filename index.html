@@ -13,27 +13,69 @@
 </body>
 
 <script>
-    var Module = {
-        onRuntimeInitialized: () => {
-try {
-    
-    var txt = new TextEncoder().encode("print(433)");
-    Module._load_lua(txt);
-} catch (error) {
-    console.log(error)
-}
-        }
-    };
-</script>
-
-<script src="build/web/Debug/wumbo.js">
-</script>
-<script>
 
 
     const result = document.getElementById("result");
     const error = document.getElementById("error");
     const ouput = document.getElementById("ouput");
+
+    let importObject;
+    const load = async (buffer) => {
+        const { module, instance } = await WebAssembly.instantiate(buffer, importObject);
+        const { start } = instance.exports;
+        return start;
+    };
+
+    importObject = {
+        print: {
+            value: arg => {
+                console.log(arg);
+                ouput.innerHTML += arg + "<br />";
+            },
+            string: arg => {
+                arg = new TextDecoder().decode(arg)
+                console.log(arg);
+                ouput.innerHTML += arg + "<br />";
+            },
+            array: size => new Uint8Array(size),
+            set_array: (array, index, value) => array[index] = value,
+        },
+        load: {
+            load: load
+        }
+    };
+
+
+    var Module = {
+        onRuntimeInitialized: async () => {
+            try {
+                //Module.__initialize();
+                const txt = new TextEncoder().encode("print(\"adada\")");
+                const load_lua = Module.cwrap("load_lua", "number", ["array", "number"]);
+                const clean_up = Module.cwrap("clean_up", "void", ["number"]);
+                const get_size = Module.cwrap("get_size", "number", ["number"]);
+                const get_data = Module.cwrap("get_data", "number", ["number"]);
+
+                const result = load_lua(txt, txt.length);
+                const wasm_bytes = get_data(result);
+                const wasm_size = get_size(result);
+
+                const buffer = Module.HEAPU8.subarray(wasm_bytes, wasm_bytes + wasm_size);
+                const start = await load(buffer);
+                clean_up(result);
+                result.innerHTML = start();
+
+
+            } catch (error) {
+                console.log(error)
+            }
+        }
+    };
+
+
+
+
+
 
 
     // awaWebAssembly.instantiate(buffer, importObject).then(
@@ -68,31 +110,7 @@ try {
     // const 
 
 
-    let importObject;
-    const load = async (buffer) => {
-        const { module, instance } = await WebAssembly.instantiate(buffer, importObject);
-        const { start } = instance.exports;
-        return start;
-    };
 
-    importObject = {
-        print: {
-            value: arg => {
-                console.log(arg);
-                ouput.innerHTML += arg + "<br />";
-            },
-            string: arg => {
-                arg = new TextDecoder().decode(arg)
-                console.log(arg);
-                ouput.innerHTML += arg + "<br />";
-            },
-            array: size => new Uint8Array(size),
-            set_array: (array, index, value) => array[index] = value,
-        },
-        load: {
-            load: load
-        }
-    };
 
     // WebAssembly.instantiateStreaming(fetch("build/dev/Debug/out.wasm", { cache: "no-store" }), importObject).then(
     //     ({ module, instance }) => {
@@ -107,7 +125,8 @@ try {
     // py -m http.server
     //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
 </script>
-
+<script src="build/web/Release/wumbo.js">
+</script>
 
 
 </html>

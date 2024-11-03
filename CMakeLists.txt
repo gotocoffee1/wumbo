@@ -82,6 +82,9 @@ if (EMSCRIPTEN)
   #"SHELL:-s STANDALONE_WASM"
   #"SHELL:-s ASSERTIONS=2"
   #"SHELL:-s ALLOW_MEMORY_GROWTH"
+  #"SHELL:-s  EXIT_RUNTIME=0"
+  "SHELL:-sEXPORTED_RUNTIME_METHODS=cwrap"
+  --no-entry
   -fexceptions)
 else()
   target_link_libraries(wumbo_exe PUBLIC CLI11::CLI11)

@@ -10,27 +10,34 @@ bool parse_string(std::string_view string, ast::block& state);
 void to_stream_bin(std::ostream& f, const wasm::mod& m);
 void to_stream_text(std::ostream& f, const wasm::mod& m);
 
-#include <sstream>
-#include <iostream>
-
 #if defined(__EMSCRIPTEN__)
 #include <emscripten.h>
-EMSCRIPTEN_KEEPALIVE
-extern "C" void load_lua(std::string data)
+extern "C"
 {
-    std::cout << data.size() << "\n";
+    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size)
+    {
+        ast::block chunk;
 
-    ast::block chunk;
+        parse_string(std::string_view{str, size}, chunk);
+        wasm::mod wasm = wumbo::compile(chunk);
 
-    parse_string(data, chunk);
-    //wasm::mod result = wumbo::compile(chunk);
+        return new result{to_stream_bin(wasm)};
+    }
 
-    //std::ostringstream stream{std::ios_base::binary | std::ios_base::out};
-    //to_stream_bin(stream, result);
-}
+    EMSCRIPTEN_KEEPALIVE void clean_up(result* ptr)
+    {
+        delete ptr;
+    }
 
-int main()
-{
+    EMSCRIPTEN_KEEPALIVE size_t get_size(result* ptr)
+    {
+        return ptr->size;
+    }
+
+    EMSCRIPTEN_KEEPALIVE void* get_data(result* ptr)
+    {
+        return ptr->data.get();
+    }
 }
 
 #else
@@ -45,6 +52,7 @@ int main(int argc, char** argv)
         try
         {
             ast::block chunk;
+            //const auto r = parse_string(argv[i], chunk);
             const auto r = parse_file(argv[i], chunk);
             ast::printer p{std::cout};
             p(chunk);
