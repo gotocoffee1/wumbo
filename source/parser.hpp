@@ -340,7 +340,8 @@ using namespace TAO_PEGTL_NAMESPACE;
    struct assignment_variable_list : list_must< variable, one< ',' >, sep > {};
    struct assignments_one : if_must< one< '=' >, seps, expr_list_must > {};
    struct assignments : seq< assignment_variable_list, seps, assignments_one > {};
-   struct function_name : seq< list< name, one< '.' >, sep >, seps, opt_must< one< ':' >, seps, name, seps > > {};
+   struct method_name : seq< name > {};
+   struct function_name : seq< list< name, one< '.' >, sep >, seps, opt_must< one< ':' >, seps, method_name, seps > > {};
    struct function_definition : if_must< key_function, seps, function_name, function_body > {};
 
    struct local_function : if_must< key_function, seps, name, seps, function_body > {};

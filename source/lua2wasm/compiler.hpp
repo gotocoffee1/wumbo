@@ -568,10 +568,7 @@ struct compiler : ext_types
     expr_ref_list operator()(const repeat_statement& p);
     expr_ref_list operator()(const for_each& p);
 
-    auto operator()(const function_definition& p) -> expr_ref_list
-    {
-        return {add_func_ref(p.function_name.back().c_str(), p.body)};
-    }
+    expr_ref_list operator()(const function_definition& p);
     expr_ref_list operator()(const local_function& p);
     expr_ref_list operator()(const local_variables& p);
 

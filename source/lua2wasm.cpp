@@ -19,13 +19,13 @@ wasm::mod compile(const block& chunk)
 
     BinaryenModuleValidate(mod);
 
-    auto feature = BinaryenModuleGetFeatures(mod);
-    auto res = BinaryenModuleAllocateAndWrite(mod, nullptr);
-    result.impl.reset(BinaryenModuleReadWithFeatures((char*)res.binary, res.binaryBytes, feature));
-    mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
-    free(res.binary);
-    free(res.sourceMap);
-    BinaryenModuleOptimize(mod);
+    //auto feature = BinaryenModuleGetFeatures(mod);
+    //auto res = BinaryenModuleAllocateAndWrite(mod, nullptr);
+    //result.impl.reset(BinaryenModuleReadWithFeatures((char*)res.binary, res.binaryBytes, feature));
+    //mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
+    //free(res.binary);
+    //free(res.sourceMap);
+    //BinaryenModuleOptimize(mod);
 
     return result;
 }

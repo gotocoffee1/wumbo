@@ -162,6 +162,23 @@ expr_ref_list compiler::operator()(const assignments& p)
     return result;
 }
 
+expr_ref_list compiler::operator()(const function_definition& p)
+{
+    auto function = add_func_ref(p.function_name.back().c_str(), p.body);
+    expr_ref result;
+    if (p.function_name.size() == 1)
+        result = set_var(p.function_name.front(), function);
+    else
+    {
+        auto tbl = get_var(p.function_name.front());
+        for (size_t i = 1; i < (p.function_name.size() - 1); ++i)
+            tbl = table_get(tbl, add_string(p.function_name[i]));
+
+        result = table_set(tbl, add_string(p.function_name.back()), function);
+    }
+     return {result};
+}
+
 expr_ref_list compiler::operator()(const function_call& p)
 {
     auto exp = _funchead(p.head);

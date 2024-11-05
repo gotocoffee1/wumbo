@@ -221,10 +221,9 @@ struct action<name>
     }
 
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::name_t& name, ast::function_definition& p)
+    static void success(const ParseInput&, ast::name_t& name, std::pair<ast::function_definition, bool>& p)
     {
-        // TODO
-        p.function_name.push_back(std::move(name));
+        p.first.function_name.push_back(std::move(name));
     }
 };
 
@@ -372,6 +371,15 @@ struct action<variable> : change_states<ast::var>
 };
 
 template<>
+struct action<method_name>
+{
+    static void apply0(std::pair<ast::function_definition, bool>& p)
+    {
+        p.second = true;
+    }
+};
+
+template<>
 struct action<function_args> : change_states<ast::args>
 {
     template<typename ParseInput>
@@ -385,9 +393,9 @@ template<>
 struct action<function_body> : fill_expression<ast::function_body>
 {
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::function_body& c, ast::function_definition& p)
+    static void success(const ParseInput&, ast::function_body& c, std::pair<ast::function_definition, bool>& p)
     {
-        p.body = std::move(c);
+        p.first.body = std::move(c);
     }
 
     template<typename ParseInput>
@@ -678,8 +686,6 @@ template<> struct action<repeat_statement> : state<ast::repeat_statement>{};
 
 template<> struct action<if_statement> : state<ast::if_statement>{};
 
-template<> struct action<function_definition> : state<ast::function_definition>{};
-
 template<> struct action<local_function> : state<ast::local_function>{};
 
 template<> struct action<local_variables> : state<ast::local_variables>{};
@@ -692,6 +698,21 @@ struct action<else_statement> : change_states<ast::block>
     static void success(const ParseInput&, ast::block& c, ast::if_statement& p)
     {
         p.else_block.emplace(std::move(c));
+    }
+};
+
+template<>
+struct action<function_definition> : change_states<std::pair<ast::function_definition, bool>>
+{
+    template<typename ParseInput>
+    static void success(const ParseInput&, std::pair<ast::function_definition, bool>& c, ast::statement& p)
+    {
+        auto& [def, is_method] = c;
+        if (is_method)
+        {
+            def.body.params.insert(def.body.params.begin(), "self");
+        }
+        p.inner.emplace<ast::function_definition>(std::move(def));
     }
 };
 
@@ -811,53 +832,5 @@ struct action<statement_list<End>> : change_states<ast::block>
         p.cond_block.back().second = std::move(c);
     }
 };
-
-} // namespace lua53
-
-#include <tao/pegtl/contrib/parse_tree.hpp>
-
-namespace lua53
-{
-template<typename Rule>
-using selector = parse_tree::selector<
-    Rule,
-    parse_tree::store_content::on<
-        key_or,
-        key_and,
-        operators_two,
-        one<'|'>,
-        op_one<'~', '='>,
-        one<'&'>,
-        operators_six,
-        op_two<'.', '.', '.'>,
-        operators_eight,
-        operators_nine,
-        unary_operators,
-        key_nil,
-        key_true,
-        key_false,
-        ellipsis,
-        numeral,
-        literal_string,
-        function_literal,
-        expr_thirteen,
-        table_constructor,
-
-        expression,
-        expr_one,
-        expr_two,
-        expr_three,
-        expr_four,
-        expr_five,
-        expr_six,
-        expr_seven,
-        expr_eight,
-        expr_nine,
-        expr_ten,
-        expr_eleven,
-        expr_twelve,
-        expr_thirteen
-
-        >>;
 
 } // namespace lua53

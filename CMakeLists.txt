@@ -50,6 +50,9 @@ FetchContent_Declare(
 )
 
 
+set(EMSCRIPTEN_ENABLE_WASM_EH ON CACHE BOOL "" FORCE)
+
+
 FetchContent_GetProperties(binaryen)
 if(NOT binaryen_POPULATED)
   FetchContent_Populate(binaryen)
@@ -77,7 +80,7 @@ target_link_libraries(wumbo_exe PUBLIC wumbo)
 
 if (EMSCRIPTEN)
   target_compile_options(wumbo PUBLIC
-  -fexceptions)
+  -fwasm-exceptions)
   target_link_options(wumbo PUBLIC
   #"SHELL:-s STANDALONE_WASM"
   #"SHELL:-s ASSERTIONS=2"
@@ -85,7 +88,7 @@ if (EMSCRIPTEN)
   #"SHELL:-s  EXIT_RUNTIME=0"
   "SHELL:-sEXPORTED_RUNTIME_METHODS=cwrap"
   --no-entry
-  -fexceptions)
+  -fwasm-exceptions)
 else()
   target_link_libraries(wumbo_exe PUBLIC CLI11::CLI11)
 endif()
