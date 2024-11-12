@@ -37,7 +37,7 @@ expr_ref compiler::table_set(expr_ref table, expr_ref key, expr_ref value)
                      BinaryenTypeNone());
 }
 
-BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
+BinaryenFunctionRef compiler::compare(const char* name, value_type vtype)
 {
     auto casts = std::array{
         vtype,
@@ -50,7 +50,7 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
     };
     std::vector<BinaryenType> vars;
 
-    auto block = make_block(switch_value(local_get(1, anyref()), casts, [&](value_types type_right, expr_ref exp_right)
+    auto block = make_block(switch_value(local_get(1, anyref()), casts, [&](value_type type_right, expr_ref exp_right)
                                          {
                                              if (vtype != type_right)
                                              {
@@ -60,18 +60,18 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
                                              }
                                              switch (type_right)
                                              {
-                                             case value_types::integer:
+                                             case value_type::integer:
                                                  return make_return(BinaryenBinary(mod, BinaryenEqInt64(), BinaryenStructGet(mod, 0, exp, integer_type(), false), BinaryenStructGet(mod, 0, exp_right, integer_type(), false)));
-                                             case value_types::number:
+                                             case value_type::number:
                                                  return make_return(BinaryenBinary(mod, BinaryenEqFloat64(), BinaryenStructGet(mod, 0, exp, number_type(), false), BinaryenStructGet(mod, 0, exp_right, number_type(), false)));
-                                             case value_types::table:
-                                             case value_types::function:
-                                             case value_types::thread:
+                                             case value_type::table:
+                                             case value_type::function:
+                                             case value_type::thread:
                                                  return BinaryenRefEq(mod, exp, exp_right);
 
-                                             case value_types::string:
+                                             case value_type::string:
                                              {
-                                                 auto string_t = type<value_types::string>();
+                                                 auto string_t = type<value_type::string>();
                                                  auto i        = vars.size() + std::size(params);
                                                  vars.push_back(size_type());
                                                  auto exp_i = vars.size() + std::size(params);
@@ -108,10 +108,9 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
 
                                                          const_i32(0)));
                                              }
-                                             case value_types::nil:
-                                             case value_types::boolean:
-                                             case value_types::userdata:
-                                             case value_types::dynamic:
+                                             case value_type::nil:
+                                             case value_type::boolean:
+                                             case value_type::userdata:
                                              default:
                                                  return BinaryenUnreachable(mod);
                                              }
@@ -130,9 +129,9 @@ BinaryenFunctionRef compiler::compare(const char* name, value_types vtype)
 
 void compiler::func_table_get()
 {
-    auto init_table_type_get = [this](const std::string& name, value_types vtype)
+    auto init_table_type_get = [this](const std::string& name, value_type vtype)
     {
-        auto table = local_get(0, type<value_types::table>());
+        auto table = local_get(0, type<value_type::table>());
         auto key   = local_get(1, type(vtype));
 
         auto bucket = BinaryenStructGet(mod,
@@ -142,7 +141,7 @@ void compiler::func_table_get()
                                         false);
 
         BinaryenType params[] = {
-            type<value_types::table>(),
+            type<value_type::table>(),
             type(vtype),
         };
 
@@ -182,9 +181,9 @@ void compiler::func_table_get()
                                    }));
     };
 
-    auto init_table_type_set = [this](const std::string& name, value_types vtype)
+    auto init_table_type_set = [this](const std::string& name, value_type vtype)
     {
-        auto table = local_get(0, type<value_types::table>());
+        auto table = local_get(0, type<value_type::table>());
         auto key   = local_get(1, type(vtype));
         auto value = local_get(2, anyref());
 
@@ -195,7 +194,7 @@ void compiler::func_table_get()
                                         false);
 
         BinaryenType params[] = {
-            type<value_types::table>(),
+            type<value_type::table>(),
             type(vtype),
             anyref(),
         };
@@ -246,7 +245,7 @@ void compiler::func_table_get()
     auto table = local_get(0, anyref());
     auto key   = local_get(1, anyref());
     auto value = local_get(2, anyref());
-    table      = BinaryenRefCast(mod, table, type<value_types::table>());
+    table      = BinaryenRefCast(mod, table, type<value_type::table>());
 
     //auto hash = calc_hash(key);
 
@@ -255,9 +254,9 @@ void compiler::func_table_get()
     //auto bucket = ;
 
     auto casts = std::array{
-        value_types::number,
-        value_types::integer,
-        value_types::string,
+        value_type::number,
+        value_type::integer,
+        value_type::string,
     };
 
     for (auto value : casts)
@@ -280,7 +279,7 @@ void compiler::func_table_get()
                             0,
                             make_block(switch_value(key,
                                                     casts,
-                                                    [&](value_types type, expr_ref exp)
+                                                    [&](value_type type, expr_ref exp)
                                                     {
                                                         expr_ref args[] = {
                                                             table,
@@ -290,24 +289,23 @@ void compiler::func_table_get()
                                                         const char* func;
                                                         switch (type)
                                                         {
-                                                        case value_types::integer:
+                                                        case value_type::integer:
                                                             func = "*table_get_integer";
                                                             break;
-                                                        case value_types::number:
+                                                        case value_type::number:
                                                             func = "*table_get_number";
                                                             break;
-                                                        case value_types::string:
+                                                        case value_type::string:
                                                             func = "*table_get_string";
                                                             break;
-                                                        case value_types::nil:
-                                                        case value_types::boolean:
-                                                        case value_types::function:
-                                                        case value_types::userdata:
-                                                        case value_types::thread:
-                                                        case value_types::table:
+                                                        case value_type::nil:
+                                                        case value_type::boolean:
+                                                        case value_type::function:
+                                                        case value_type::userdata:
+                                                        case value_type::thread:
+                                                        case value_type::table:
 
                                                         default:
-                                                        case value_types::dynamic:
                                                             return BinaryenUnreachable(mod);
                                                         }
 
@@ -337,7 +335,7 @@ void compiler::func_table_get()
                             0,
                             make_block(switch_value(key,
                                                     casts,
-                                                    [&](value_types type, expr_ref exp)
+                                                    [&](value_type type, expr_ref exp)
                                                     {
                                                         expr_ref args[] = {
                                                             table,
@@ -348,24 +346,23 @@ void compiler::func_table_get()
                                                         const char* func;
                                                         switch (type)
                                                         {
-                                                        case value_types::integer:
+                                                        case value_type::integer:
                                                             func = "*table_set_integer";
                                                             break;
-                                                        case value_types::number:
+                                                        case value_type::number:
                                                             func = "*table_set_number";
                                                             break;
-                                                        case value_types::string:
+                                                        case value_type::string:
                                                             func = "*table_set_string";
                                                             break;
-                                                        case value_types::nil:
-                                                        case value_types::boolean:
-                                                        case value_types::function:
-                                                        case value_types::userdata:
-                                                        case value_types::thread:
-                                                        case value_types::table:
+                                                        case value_type::nil:
+                                                        case value_type::boolean:
+                                                        case value_type::function:
+                                                        case value_type::userdata:
+                                                        case value_type::thread:
+                                                        case value_type::table:
 
                                                         default:
-                                                        case value_types::dynamic:
                                                             return BinaryenUnreachable(mod);
                                                         }
 
@@ -410,6 +407,6 @@ expr_ref compiler::operator()(const table_constructor& p)
         array,
         BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(exp), std::size(exp)),
     };
-    return BinaryenStructNew(mod, std::data(table_init), std::size(table_init), BinaryenTypeGetHeapType(type<value_types::table>()));
+    return BinaryenStructNew(mod, std::data(table_init), std::size(table_init), BinaryenTypeGetHeapType(type<value_type::table>()));
 }
 } // namespace wumbo

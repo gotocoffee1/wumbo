@@ -25,11 +25,11 @@ expr_ref_list compiler::open_basic_lib()
             BinaryenTypeExternref(),
         };
 
-        auto str     = local_get(0, type<value_types::string>()); // get string
+        auto str     = local_get(0, type<value_type::string>()); // get string
         auto str_len = array_len(str);                            // get string len
         BinaryenAddFunction(mod,
                             "*lua_str_to_js_array",
-                            type<value_types::string>(),
+                            type<value_type::string>(),
                             BinaryenTypeExternref(),
                             std::data(locals),
                             std::size(locals),
@@ -117,44 +117,43 @@ expr_ref_list compiler::open_basic_lib()
                  exp = array_get(exp, const_i32(0), anyref());
 
                  auto casts = std::array{
-                     //    value_types::boolean,
-                     value_types::number,
-                     value_types::integer,
-                     value_types::string,
+                     //    value_type::boolean,
+                     value_type::number,
+                     value_type::integer,
+                     value_type::string,
                  };
 
-                 auto s = [&](value_types type, expr_ref exp)
+                 auto s = [&](value_type type, expr_ref exp)
                  {
                      const char* func;
                      switch (type)
                      {
-                     case value_types::nil:
+                     case value_type::nil:
                          exp  = null();
                          func = "print_nil";
                          break;
-                     case value_types::boolean:
+                     case value_type::boolean:
                          exp  = null();
                          func = "print_nil";
                          break;
-                     case value_types::integer:
+                     case value_type::integer:
                          func = "print_integer";
                          exp  = BinaryenStructGet(mod, 0, exp, integer_type(), false);
                          break;
-                     case value_types::number:
+                     case value_type::number:
                          func = "print_number";
                          exp  = BinaryenStructGet(mod, 0, exp, number_type(), false);
                          break;
-                     case value_types::string:
+                     case value_type::string:
                      {
                          func = "print_string";
                          exp  = make_call("*lua_str_to_js_array", exp, BinaryenTypeExternref());
                          break;
                      }
-                     case value_types::function:
-                     case value_types::userdata:
-                     case value_types::thread:
-                     case value_types::table:
-                     case value_types::dynamic:
+                     case value_type::function:
+                     case value_type::userdata:
+                     case value_type::thread:
+                     case value_type::table:
                      default:
                          return BinaryenUnreachable(mod);
                      }

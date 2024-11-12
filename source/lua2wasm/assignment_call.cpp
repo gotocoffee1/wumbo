@@ -8,23 +8,23 @@ expr_ref compiler::call(expr_ref func, expr_ref args)
     if (!BinaryenGetFunction(mod, "*invoke"))
     {
         auto casts = std::array{
-            value_types::function,
+            value_type::function,
         };
         auto params = std::array{anyref(), ref_array_type()};
-        auto vars   = std::array{type<value_types::function>()};
+        auto vars   = std::array{type<value_type::function>()};
         BinaryenAddFunction(mod,
                             "*invoke",
                             BinaryenTypeCreate(std::data(params), std::size(params)),
                             ref_array_type(),
                             std::data(vars),
                             std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types exp_type, expr_ref exp)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type exp_type, expr_ref exp)
                                                     {
                                                         switch (exp_type)
                                                         {
-                                                        case value_types::function:
+                                                        case value_type::function:
                                                         {
-                                                            auto t     = type<value_types::function>();
+                                                            auto t     = type<value_type::function>();
                                                             auto local = 2;
 
                                                             auto func_ref = BinaryenStructGet(mod, 0, local_get(local, t), BinaryenTypeFuncref(), false);

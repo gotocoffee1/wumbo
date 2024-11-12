@@ -1,6 +1,7 @@
 {
   "name": "wumbo",
   "version-semver": "0.1.0",
+  "license": "MIT",
   "dependencies": [
     "pegtl",
     "cli11"

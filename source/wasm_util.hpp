@@ -5,7 +5,7 @@
 namespace wumbo
 {
 
-enum class value_types
+enum class value_type
 {
     nil,
     boolean,
@@ -16,7 +16,6 @@ enum class value_types
     userdata,
     thread,
     table,
-    dynamic,
 };
 
 using expr_ref      = BinaryenExpressionRef;
@@ -144,15 +143,15 @@ struct ext_types : utils
 
     const char* error_tag = "error";
 
-    template<value_types T>
+    template<value_type T>
     BinaryenType type() const
     {
-        return types[static_cast<std::underlying_type_t<value_types>>(T) + 3];
+        return types[static_cast<std::underlying_type_t<value_type>>(T) + 3];
     }
 
-    BinaryenType type(value_types t) const
+    BinaryenType type(value_type t) const
     {
-        return types[static_cast<std::underlying_type_t<value_types>>(t) + 3];
+        return types[static_cast<std::underlying_type_t<value_type>>(t) + 3];
     }
 
     bool big_int = true;
@@ -165,12 +164,12 @@ struct ext_types : utils
 
     expr_ref new_number(expr_ref num)
     {
-        return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::number>()));
+        return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_type::number>()));
     }
 
     expr_ref new_integer(expr_ref num)
     {
-        return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_types::integer>()));
+        return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_type::integer>()));
     }
 
     static BinaryenType number_type()
@@ -318,27 +317,27 @@ struct ext_types : utils
 
     std::size_t label_counter = 0;
 
-    static const char* to_string(value_types vtype)
+    static const char* to_string(value_type vtype)
     {
         switch (vtype)
         {
-        case value_types::nil:
+        case value_type::nil:
             return "nil";
-        case value_types::boolean:
+        case value_type::boolean:
             return "boolean";
-        case value_types::integer:
+        case value_type::integer:
             return "integer";
-        case value_types::number:
+        case value_type::number:
             return "number";
-        case value_types::string:
+        case value_type::string:
             return "string";
-        case value_types::function:
+        case value_type::function:
             return "function";
-        case value_types::userdata:
+        case value_type::userdata:
             return "userdata";
-        case value_types::thread:
+        case value_type::thread:
             return "thread";
-        case value_types::table:
+        case value_type::table:
             return "table";
         default:
             return "";
@@ -346,7 +345,7 @@ struct ext_types : utils
     }
 
     template<typename F, size_t S>
-    auto switch_value(expr_ref exp, const std::array<value_types, S>& casts, F&& code)
+    auto switch_value(expr_ref exp, const std::array<value_type, S>& casts, F&& code)
     {
         auto n       = "nil" + std::to_string(label_counter++);
         auto counter = label_counter;
@@ -359,7 +358,7 @@ struct ext_types : utils
 
         expr_ref inner[] = {
             drop(exp),
-            code(value_types{-1}, nullptr),
+            code(value_type{-1}, nullptr),
         };
         bool once = false;
         for (auto vtype : casts)
@@ -371,7 +370,7 @@ struct ext_types : utils
 
         return std::array{
             BinaryenBlock(mod, n.c_str(), &exp, 1, BinaryenTypeAuto()),
-            code(value_types::nil, nullptr),
+            code(value_type::nil, nullptr),
         };
     }
 
@@ -616,7 +615,7 @@ struct ext_types : utils
 
         BinaryenAddTag(mod, error_tag, anyref(), BinaryenTypeNone());
 
-        types[static_cast<std::underlying_type_t<value_types>>(value_types::boolean) + 3] = BinaryenTypeI31ref();
+        types[static_cast<std::underlying_type_t<value_type>>(value_type::boolean) + 3] = BinaryenTypeI31ref();
     }
 
     expr_ref throw_error(expr_ref error)

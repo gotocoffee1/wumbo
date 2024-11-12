@@ -19,47 +19,47 @@ enum class var_type
     upvalue,
     global,
 };
-
-static value_types get_return_type(const expression& p)
+/*
+static value_type get_return_type(const expression& p)
 {
     return std::visit(overload{
                           [](const nil&)
                           {
-                              return value_types::nil;
+                              return value_type::nil;
                           },
                           [](const boolean& p)
                           {
-                              return value_types::boolean;
+                              return value_type::boolean;
                           },
                           [](const int_type& p)
                           {
-                              return value_types::integer;
+                              return value_type::integer;
                           },
                           [](const float_type& p)
                           {
-                              return value_types::number;
+                              return value_type::number;
                           },
                           [](const literal& p)
                           {
-                              return value_types::string;
+                              return value_type::string;
                           },
                           [](const ellipsis& p)
                           {
-                              return value_types::dynamic;
+                              return value_type{-1};
                           },
                           [](const function_body& p)
                           {
-                              return value_types::function;
+                              return value_type::function;
                           },
                           [](const table_constructor& p)
                           {
-                              return value_types::table;
+                              return value_type::table;
                           },
                           [](const box<bin_operation>& p)
                           {
                               auto lhs = get_return_type(p->lhs);
                               auto rhs = get_return_type(p->rhs);
-                              if (lhs == value_types::integer && rhs == value_types::integer)
+                              if (lhs == value_type::integer && rhs == value_type::integer)
                               {
                                   switch (p->op)
                                   {
@@ -74,10 +74,10 @@ static value_types get_return_type(const expression& p)
                                   default:
                                       break;
                                   }
-                                  return value_types::integer;
+                                  return value_type::integer;
                               }
 
-                              if (lhs == value_types::number && rhs == value_types::number)
+                              if (lhs == value_type::number && rhs == value_type::number)
                               {
                                   switch (p->op)
                                   {
@@ -93,21 +93,21 @@ static value_types get_return_type(const expression& p)
                                       break;
                                   }
 
-                                  return value_types::number;
+                                  return value_type::number;
                               }
                               else
                               {
-                                  if (lhs == value_types::integer && rhs == value_types::number)
+                                  if (lhs == value_type::integer && rhs == value_type::number)
                                   {
-                                      return value_types::number;
+                                      return value_type::number;
                                   }
-                                  if (lhs == value_types::number && rhs == value_types::integer)
+                                  if (lhs == value_type::number && rhs == value_type::integer)
                                   {
-                                      return value_types::number;
+                                      return value_type::number;
                                   }
                               }
 
-                              return value_types::dynamic;
+                              return value_type::dynamic;
                           },
                           [](const box<un_operation>& p)
                           {
@@ -116,32 +116,32 @@ static value_types get_return_type(const expression& p)
                               switch (p->op)
                               {
                               case un_operator::minus:
-                                  if (rhs == value_types::number)
-                                      return value_types::number;
-                                  else if (rhs == value_types::integer)
-                                      return value_types::integer;
+                                  if (rhs == value_type::number)
+                                      return value_type::number;
+                                  else if (rhs == value_type::integer)
+                                      return value_type::integer;
                                   break;
                               case un_operator::logic_not:
                                   break;
                               case un_operator::len:
-                                  return value_types::integer;
+                                  return value_type::integer;
                               case un_operator::binary_not:
                                   break;
                               default:
                                   break;
                               }
-                              return value_types::dynamic;
+                              return value_type::dynamic;
                           },
 
                           [](const auto&)
                           {
-                              return value_types::dynamic;
+                              return value_type::dynamic;
                           },
                       } // namespace lua2wasm
                       ,
                       p.inner);
 }
-
+*/
 struct compiler : ext_types
 {
     struct local_var
@@ -166,6 +166,9 @@ struct compiler : ext_types
         size_t offset;
         size_t arg_count;
         std::optional<size_t> vararg_offset;
+
+        std::vector<std::string> label_stack;
+        std::vector<std::string> request_label_stack;
     };
 
     struct function_stack
@@ -188,8 +191,8 @@ struct compiler : ext_types
 
         void pop_loop()
         {
-            loop_stack.back()++;
-            loop_counter++;
+            loop_stack.back()--;
+            loop_counter--;
         }
 
         void push_block()
@@ -199,11 +202,11 @@ struct compiler : ext_types
 
         void pop_block()
         {
-            for (size_t i = blocks.size(); i < vars.size(); ++i)
+            for (size_t i = blocks.back(); i < vars.size(); ++i)
             {
                 auto& var = vars[i];
                 if (!(var.flags & local_var::is_helper))
-                    var.flags &= local_var::is_used;
+                    var.flags &= ~local_var::is_used;
             }
             blocks.pop_back();
         }
@@ -484,20 +487,37 @@ struct compiler : ext_types
     auto operator()(const label_statement& p)
     {
         expr_ref_list result;
+
+        auto& label_stack         = _func_stack.functions.back().label_stack;
+        auto& request_label_stack = _func_stack.functions.back().request_label_stack;
+
+        if (auto iter = std::find(request_label_stack.begin(), request_label_stack.end(), p.name); iter != request_label_stack.end())
+        {
+            BinaryenBreak(mod, p.name.c_str(), nullptr, nullptr);
+        }
+
+        label_stack.push_back(p.name);
         return result;
     }
     auto operator()(const goto_statement& p)
     {
         expr_ref_list result;
 
-        //BinaryenBreak(mod, p.name.c_str(), nullptr, nullptr);
+        auto& label_stack         = _func_stack.functions.back().label_stack;
+        auto& request_label_stack = _func_stack.functions.back().request_label_stack;
+        if (auto iter = std::find(label_stack.begin(), label_stack.end(), p.name); iter != label_stack.end())
+        {
+            BinaryenBreak(mod, p.name.c_str(), nullptr, nullptr);
+        }
+        else
+            request_label_stack.push_back(p.name);
 
         return result;
     }
     auto to_bool()
     {
         auto casts = std::array{
-            value_types::boolean,
+            value_type::boolean,
         };
 
         BinaryenAddFunction(mod,
@@ -506,13 +526,13 @@ struct compiler : ext_types
                             bool_type(),
                             nullptr,
                             0,
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
                                                     {
                                                         switch (type)
                                                         {
-                                                        case value_types::nil:
+                                                        case value_type::nil:
                                                             return make_return(const_i32(0));
-                                                        case value_types::boolean:
+                                                        case value_type::boolean:
                                                             return make_return(BinaryenI31Get(mod, exp, false));
                                                         default:
                                                             return make_return(const_i32(1));
@@ -524,13 +544,13 @@ struct compiler : ext_types
                             bool_type(),
                             nullptr,
                             0,
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
                                                     {
                                                         switch (type)
                                                         {
-                                                        case value_types::nil:
+                                                        case value_type::nil:
                                                             return make_return(const_i32(1));
-                                                        case value_types::boolean:
+                                                        case value_type::boolean:
                                                             return make_return(BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenI31Get(mod, exp, false)));
                                                         default:
                                                             return make_return(const_i32(0));
@@ -601,7 +621,7 @@ struct compiler : ext_types
     {
         auto name = std::to_string(data_name++);
         BinaryenAddDataSegment(mod, name.c_str(), "", true, 0, str.data(), str.size());
-        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_types::string>()), name.c_str(), const_i32(0), const_i32(str.size()));
+        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_type::string>()), name.c_str(), const_i32(0), const_i32(str.size()));
     }
 
     expr_ref operator()(const literal& p)
@@ -774,7 +794,7 @@ struct compiler : ext_types
             BinaryenRefFunc(mod, name, sig),
             ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(upvalue_array_type()), std::data(ups), std::size(ups)),
         };
-        return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_types::function>()));
+        return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_type::function>()));
     }
 
     auto add_func_ref(const char* name, const block& inner, const name_list& p, bool vararg)
@@ -811,7 +831,7 @@ struct compiler : ext_types
 
     expr_ref table_set(expr_ref table, expr_ref key, expr_ref value);
 
-    BinaryenFunctionRef compare(const char* name, value_types vtype);
+    BinaryenFunctionRef compare(const char* name, value_type vtype);
     void func_table_get();
     expr_ref operator()(const table_constructor& p);
 

@@ -17,7 +17,7 @@ void compiler::make_bin_operation()
                             anyref(),
                             std::data(vars),
                             std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types left_type, expr_ref left)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type left_type, expr_ref left)
                                                     {
                                                         if (std::find(std::begin(casts), std::end(casts), left_type) == std::end(casts))
                                                             return throw_error(add_string("unexpected type"));
@@ -34,20 +34,20 @@ void compiler::make_bin_operation()
                                                                             anyref(),
                                                                             std::data(vars),
                                                                             std::size(vars),
-                                                                            make_block(switch_value(local_get(1, anyref()), casts, [&](value_types right_type, expr_ref right)
+                                                                            make_block(switch_value(local_get(1, anyref()), casts, [&](value_type right_type, expr_ref right)
                                                                                                     {
                                                                                                         auto left = local_get(0, type(left_type));
 
                                                                                                         switch (left_type)
                                                                                                         {
-                                                                                                        case value_types::integer:
+                                                                                                        case value_type::integer:
                                                                                                             left = BinaryenStructGet(mod, 0, left, integer_type(), false);
                                                                                                             switch (right_type)
                                                                                                             {
-                                                                                                            case value_types::integer:
+                                                                                                            case value_type::integer:
                                                                                                                 right = BinaryenStructGet(mod, 0, right, integer_type(), false);
                                                                                                                 break;
-                                                                                                            case value_types::number:
+                                                                                                            case value_type::number:
                                                                                                                 right = BinaryenStructGet(mod, 0, right, number_type(), false);
                                                                                                                 break;
                                                                                                             default:
@@ -55,14 +55,14 @@ void compiler::make_bin_operation()
                                                                                                             }
                                                                                                             break;
 
-                                                                                                        case value_types::number:
+                                                                                                        case value_type::number:
                                                                                                             left = BinaryenStructGet(mod, 0, left, number_type(), false);
                                                                                                             switch (right_type)
                                                                                                             {
-                                                                                                            case value_types::integer:
+                                                                                                            case value_type::integer:
                                                                                                                 right = BinaryenStructGet(mod, 0, right, integer_type(), false);
                                                                                                                 break;
-                                                                                                            case value_types::number:
+                                                                                                            case value_type::number:
                                                                                                                 right = BinaryenStructGet(mod, 0, right, number_type(), false);
                                                                                                                 break;
                                                                                                             default:
@@ -84,8 +84,8 @@ void compiler::make_bin_operation()
 
     {
         auto casts = std::array{
-            value_types::integer,
-            value_types::number,
+            value_type::integer,
+            value_type::number,
         };
 
         auto functions = std::array{
@@ -100,29 +100,29 @@ void compiler::make_bin_operation()
 
         for (auto& [function, int_op, num_op] : functions)
         {
-            make_func(function, casts, [&](value_types left_type, value_types right_type, expr_ref left, expr_ref right)
+            make_func(function, casts, [&](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
                       {
                           switch (left_type)
                           {
-                          case value_types::integer:
+                          case value_type::integer:
                               switch (right_type)
                               {
-                              case value_types::integer:
+                              case value_type::integer:
                                   return make_return(new_integer(std::invoke(int_op, this, left, right)));
-                              case value_types::number:
+                              case value_type::number:
                                   left = int_to_num(left);
                                   return make_return(new_number(std::invoke(num_op, this, left, right)));
                               default:
                                   return throw_error(add_string("unexpected type"));
                               }
 
-                          case value_types::number:
+                          case value_type::number:
                               switch (right_type)
                               {
-                              case value_types::integer:
+                              case value_type::integer:
                                   right = int_to_num(right);
                                   return make_return(new_number(std::invoke(num_op, this, left, right)));
-                              case value_types::number:
+                              case value_type::number:
                                   return make_return(new_number(std::invoke(num_op, this, left, right)));
                               default:
                                   return throw_error(add_string("unexpected type"));
@@ -143,29 +143,29 @@ void compiler::make_bin_operation()
 
         for (auto& [function, int_op] : bitop)
         {
-            make_func(function, casts, [&](value_types left_type, value_types right_type, expr_ref left, expr_ref right)
+            make_func(function, casts, [&](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
                       {
                           switch (left_type)
                           {
-                          case value_types::integer:
+                          case value_type::integer:
                               switch (right_type)
                               {
-                              case value_types::integer:
+                              case value_type::integer:
                                   return make_return(new_integer(std::invoke(int_op, this, left, right)));
-                              case value_types::number:
+                              case value_type::number:
                                   //left = int_to_num(left);
                                   //return make_return(new_number(std::invoke(int_op, this, left, right)));
                               default:
                                   return throw_error(add_string("unexpected type"));
                               }
 
-                          case value_types::number:
+                          case value_type::number:
                               switch (right_type)
                               {
-                              case value_types::integer:
+                              case value_type::integer:
                                   //right = int_to_num(right);
                                   //return make_return(new_number(std::invoke(int_op, this, left, right)));
-                              case value_types::number:
+                              case value_type::number:
                                   //return make_return(new_number(std::invoke(int_op, this, left, right)));
                               default:
                                   return throw_error(add_string("unexpected type"));
@@ -187,29 +187,29 @@ void compiler::make_bin_operation()
 
         for (auto& [function, int_op, num_op] : relational)
         {
-            make_func(function, casts, [&](value_types left_type, value_types right_type, expr_ref left, expr_ref right)
+            make_func(function, casts, [&](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
                       {
                           switch (left_type)
                           {
-                          case value_types::integer:
+                          case value_type::integer:
                               switch (right_type)
                               {
-                              case value_types::integer:
+                              case value_type::integer:
                                   return make_return(new_boolean(std::invoke(int_op, this, left, right)));
-                              case value_types::number:
+                              case value_type::number:
                                   left = int_to_num(left);
                                   return make_return(new_boolean(std::invoke(num_op, this, left, right)));
                               default:
                                   return throw_error(add_string("unexpected type"));
                               }
 
-                          case value_types::number:
+                          case value_type::number:
                               switch (right_type)
                               {
-                              case value_types::integer:
+                              case value_type::integer:
                                   right = int_to_num(right);
                                   return make_return(new_boolean(std::invoke(num_op, this, left, right)));
-                              case value_types::number:
+                              case value_type::number:
                                   return make_return(new_boolean(std::invoke(num_op, this, left, right)));
                               default:
                                   return throw_error(add_string("unexpected type"));
@@ -321,8 +321,8 @@ void compiler::make_un_operation()
     }
     {
         auto casts = std::array{
-            value_types::integer,
-            value_types::number,
+            value_type::integer,
+            value_type::number,
         };
 
         BinaryenAddFunction(mod,
@@ -331,14 +331,14 @@ void compiler::make_un_operation()
                             anyref(),
                             std::data(vars),
                             std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
                                                     {
                                                         switch (type)
                                                         {
-                                                        case value_types::integer:
+                                                        case value_type::integer:
                                                             exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
                                                             return make_return(new_integer(xor_int(const_integer(-1), exp)));
-                                                        case value_types::number:
+                                                        case value_type::number:
                                                             // TODO
                                                             return make_return(exp);
                                                         default:
@@ -348,8 +348,8 @@ void compiler::make_un_operation()
     }
     {
         auto casts = std::array{
-            value_types::integer,
-            value_types::number,
+            value_type::integer,
+            value_type::number,
         };
         BinaryenAddFunction(mod,
                             "*minus",
@@ -357,14 +357,14 @@ void compiler::make_un_operation()
                             anyref(),
                             std::data(vars),
                             std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
                                                     {
                                                         switch (type)
                                                         {
-                                                        case value_types::integer:
+                                                        case value_type::integer:
                                                             exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
                                                             return make_return(new_integer(mul_int(const_integer(-1), exp)));
-                                                        case value_types::number:
+                                                        case value_type::number:
                                                             exp = BinaryenStructGet(mod, 0, exp, number_type(), false);
                                                             return make_return(new_number(neg_num(exp)));
                                                         default:
@@ -375,9 +375,9 @@ void compiler::make_un_operation()
 
     {
         auto casts = std::array{
-            value_types::string,
-            value_types::table,
-            //value_types::userdata,
+            value_type::string,
+            value_type::table,
+            //value_type::userdata,
         };
 
         BinaryenAddFunction(mod,
@@ -386,14 +386,14 @@ void compiler::make_un_operation()
                             anyref(),
                             std::data(vars),
                             std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_types type, expr_ref exp)
+                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
                                                     {
                                                         switch (type)
                                                         {
-                                                        case value_types::string:
+                                                        case value_type::string:
                                                             return make_return(new_integer(size_to_integer(array_len(exp))));
-                                                        case value_types::table:
-                                                        case value_types::userdata:
+                                                        case value_type::table:
+                                                        case value_type::userdata:
                                                         {
                                                             // TODO
 
