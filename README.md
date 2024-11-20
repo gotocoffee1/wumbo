@@ -20,7 +20,6 @@ requirements:
 - 🔜 good table implementation
 - 🔜 optimize upvalues
 - 🔜 check for tail calls
-- 🚧 method calls
 
 ### Libs
 

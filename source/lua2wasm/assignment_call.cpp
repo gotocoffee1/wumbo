@@ -64,8 +64,22 @@ expr_ref compiler::_funchead(const funchead& p)
 
 expr_ref compiler::_functail(const functail& p, expr_ref function)
 {
-    auto args = (*this)(p.args);
-    return call(function, args);
+    expr_ref_list args;
+
+    if (p.name)
+    {
+        // see _vartail
+        auto local = help_var_scope{_func_stack, anyref()};
+        auto tbl   = local_tee(local, function, anyref());
+        function   = table_get(tbl, add_string(*p.name));
+
+        args.push_back(local_get(local, anyref()));
+    }
+
+    for (auto& e : p.args)
+        args.push_back((*this)(e));
+
+    return call(function, (*this)(args));
 }
 
 expr_ref compiler::_vartail(const vartail& p, expr_ref var)
@@ -176,7 +190,7 @@ expr_ref_list compiler::operator()(const function_definition& p)
 
         result = table_set(tbl, add_string(p.function_name.back()), function);
     }
-     return {result};
+    return {result};
 }
 
 expr_ref_list compiler::operator()(const function_call& p)
