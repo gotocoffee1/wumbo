@@ -79,7 +79,7 @@ expr_ref compiler::_functail(const functail& p, expr_ref function)
     for (auto& e : p.args)
         args.push_back((*this)(e));
 
-    return call(function, (*this)(args));
+    return call(function, make_ref_array(args));
 }
 
 expr_ref compiler::_vartail(const vartail& p, expr_ref var)

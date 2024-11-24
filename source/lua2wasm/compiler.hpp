@@ -496,6 +496,10 @@ struct compiler : ext_types
             BinaryenBreak(mod, p.name.c_str(), nullptr, nullptr);
         }
 
+        //auto rl = RelooperCreate(mod);
+        //RelooperAddBlock(rl );
+        //RelooperRenderAndDispose(rl, )
+
         label_stack.push_back(p.name);
         return result;
     }
@@ -594,7 +598,7 @@ struct compiler : ext_types
 
     expr_ref operator()(const expression& p);
 
-    expr_ref operator()(const expr_ref_list& p);
+    expr_ref make_ref_array(const expr_ref_list& p);
     expr_ref operator()(const expression_list& p);
 
     auto operator()(const nil&)

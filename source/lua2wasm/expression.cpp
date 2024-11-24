@@ -2,7 +2,7 @@
 
 namespace wumbo
 {
-expr_ref compiler::operator()(const expr_ref_list& p)
+expr_ref compiler::make_ref_array(const expr_ref_list& p)
 {
     if (p.empty())
         return null();
@@ -63,7 +63,7 @@ expr_ref compiler::operator()(const expression_list& p)
 
     for (auto& e : p)
         list.push_back((*this)(e));
-    return (*this)(list);
+    return make_ref_array(list);
 }
 
 expr_ref compiler::operator()(const expression& p)
