@@ -2,6 +2,11 @@
 
 namespace wumbo
 {
+expr_ref compiler::make_ref_array(expr_ref p)
+{
+    return make_ref_array(expr_ref_list{p});
+}
+
 expr_ref compiler::make_ref_array(const expr_ref_list& p)
 {
     if (p.empty())

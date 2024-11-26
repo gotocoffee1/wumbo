@@ -599,6 +599,7 @@ struct compiler : ext_types
     expr_ref operator()(const expression& p);
 
     expr_ref make_ref_array(const expr_ref_list& p);
+    expr_ref make_ref_array(expr_ref p);
     expr_ref operator()(const expression_list& p);
 
     auto operator()(const nil&)

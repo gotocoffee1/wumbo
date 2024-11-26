@@ -10,6 +10,8 @@ expr_ref_list compiler::open_basic_lib()
     BinaryenAddFunctionImport(mod, "print_string", "print", "string", BinaryenTypeExternref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "new_u8array", "print", "array", size_type(), BinaryenTypeExternref());
+    BinaryenAddFunctionImport(mod, "str_to_int", "string", "to_int", BinaryenTypeExternref(), integer_type());
+    BinaryenAddFunctionImport(mod, "str_to_float", "string", "to_float", BinaryenTypeExternref(), number_type());
 
     {
         BinaryenType types[] = {
@@ -105,33 +107,44 @@ expr_ref_list compiler::open_basic_lib()
              {
                  return std::array{BinaryenUnreachable(mod)};
              });
-    add_func("pcall", {"f"}, true, [this]()
-             {
-                 auto f = get_var("f");
 
-                 auto args = (*this)(ellipsis{});
+    auto make_pcall = [this](bool x)
+    {
+        return [this, x]()
+        {
+            auto f = get_var("f");
 
-                 auto exception = help_var_scope{_func_stack, anyref()};
+            auto args = (*this)(ellipsis{});
 
-                 const char* tags[] = {error_tag};
-                 expr_ref catches[] = {
-                     make_block(std::array{
-                         local_set(exception, BinaryenPop(mod, anyref())),
-                         make_return(make_ref_array(std::vector{new_boolean(const_boolean(false)), local_get(exception, anyref())})),
-                     }),
-                 };
+            auto exception = help_var_scope{_func_stack, anyref()};
 
-                 auto try_ = BinaryenTry(mod,
-                                         nullptr,
-                                         make_return(make_ref_array(std::vector{new_boolean(const_boolean(true)), call(f, args)})),
-                                         std::data(tags),
-                                         std::size(tags),
-                                         std::data(catches),
-                                         std::size(catches),
-                                         nullptr);
+            const char* tags[] = {error_tag};
+            expr_ref catches[] = {
+                x ? make_block(std::array{
+                    local_set(exception, BinaryenPop(mod, anyref())),
+                    drop(call(get_var("msgh"), make_ref_array(local_get(exception, anyref())))),
+                    make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                })
+                  : make_block(std::array{
+                      local_set(exception, BinaryenPop(mod, anyref())),
+                      make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                  }),
+            };
 
-                 return std::array{try_};
-             });
+            auto try_ = BinaryenTry(mod,
+                                    nullptr,
+                                    make_return(make_ref_array({new_boolean(const_boolean(true)), call(f, args)})),
+                                    std::data(tags),
+                                    std::size(tags),
+                                    std::data(catches),
+                                    std::size(catches),
+                                    nullptr);
+
+            return std::array{try_};
+        };
+    };
+
+    add_func("pcall", {"f"}, true, make_pcall(false));
     add_func("print", {}, true, [this]()
              {
                  auto exp = (*this)(ellipsis{});
@@ -213,7 +226,30 @@ expr_ref_list compiler::open_basic_lib()
              });
     add_func("tonumber", {"e", "base"}, false, [this]()
              {
-                 return std::array{BinaryenUnreachable(mod)};
+                 auto e = get_var("e");
+
+                 auto casts = std::array{
+                     value_type::string,
+                     value_type::number,
+                     value_type::integer,
+                 };
+                 return switch_value(e, casts, [&](value_type type, expr_ref exp)
+                                     {
+                                         switch (type)
+                                         {
+                                         case value_type::integer:
+                                         case value_type::number:
+                                             return make_return(make_ref_array(exp));
+                                         case value_type::string:
+                                             exp = make_call("*lua_str_to_js_array", exp, BinaryenTypeExternref());
+                                             exp = make_call("str_to_float", exp, number_type());
+                                             exp = new_number(exp);
+
+                                             return make_return(make_ref_array(exp));
+                                         default:
+                                             return make_return(null());
+                                         }
+                                     });
              });
     add_func("tostring", {"v"}, false, [this]()
              {
@@ -222,7 +258,7 @@ expr_ref_list compiler::open_basic_lib()
     add_func("type", {"v"}, false, [this]()
              {
                  auto v = get_var("v");
-                 
+
                  auto casts = std::array{
                      value_type::boolean,
                      value_type::number,
@@ -234,7 +270,7 @@ expr_ref_list compiler::open_basic_lib()
                      value_type::thread,
                  };
 
-                   return switch_value(v, casts, [&](value_type type, expr_ref exp)
+                 return switch_value(v, casts, [&](value_type type, expr_ref exp)
                                      {
                                          const char* str;
                                          switch (type)
@@ -268,7 +304,7 @@ expr_ref_list compiler::open_basic_lib()
                                              return BinaryenUnreachable(mod);
                                          }
 
-                                         auto ret = make_return(make_ref_array({add_string(str)}));
+                                         auto ret = make_return(make_ref_array(add_string(str)));
                                          return exp ? make_block(std::array{
                                                     drop(exp),
                                                     ret,
@@ -276,10 +312,7 @@ expr_ref_list compiler::open_basic_lib()
                                                     : ret;
                                      });
              });
-    add_func("xpcall", {"f", "msgh"}, true, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
+    add_func("xpcall", {"f", "msgh"}, true, make_pcall(true));
     return result;
 }
 
