@@ -1,6 +1,7 @@
 #pragma once
 
 #include "box.hpp"
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <variant>
@@ -142,7 +143,7 @@ struct expr_temp
     std::optional<un_operator> u_op;
 };
 
-using args = expression_list; // size >=0
+using arg_list = expression_list; // size >=0
 
 //   vartail ::= '[' exp ']' | '.' Name
 using vartail = std::variant<expression, name_t>;
@@ -152,7 +153,7 @@ using varhead = std::variant<name_t, std::pair<expression, vartail>>;
 struct functail
 {
     std::optional<name_t> name;
-    args args;
+    arg_list args;
 };
 //   funchead ::= Name | '(' exp ')'
 using funchead = std::variant<name_t, expression>;

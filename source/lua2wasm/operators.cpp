@@ -1,5 +1,7 @@
 #include "compiler.hpp"
 
+#include <functional>
+
 namespace wumbo
 {
 

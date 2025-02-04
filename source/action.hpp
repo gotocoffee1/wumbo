@@ -137,7 +137,7 @@ template<>
 struct action<literal_string> : fill_expression<ast::literal>
 {
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::literal& c, ast::args& p)
+    static void success(const ParseInput&, ast::literal& c, ast::arg_list& p)
     {
         p.emplace_back().inner.emplace<ast::literal>(std::move(c));
     }
@@ -380,10 +380,10 @@ struct action<method_name>
 };
 
 template<>
-struct action<function_args> : change_states<ast::args>
+struct action<function_args> : change_states<ast::arg_list>
 {
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::args& c, ast::functail& p)
+    static void success(const ParseInput&, ast::arg_list& c, ast::functail& p)
     {
         p.args = std::move(c);
     }
@@ -434,7 +434,7 @@ struct action<expr_list_must> : change_states<ast::expression_list>
     }
 
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::expression_list& c, ast::args& p)
+    static void success(const ParseInput&, ast::expression_list& c, ast::arg_list& p)
     {
         p = std::move(c);
     }
@@ -793,7 +793,7 @@ template<>
 struct action<table_constructor> : fill_expression<ast::table_constructor>
 {
     template<typename ParseInput>
-    static void success(const ParseInput&, ast::table_constructor& c, ast::args& p)
+    static void success(const ParseInput&, ast::table_constructor& c, ast::arg_list& p)
     {
         p.emplace_back().inner.emplace<ast::table_constructor>(std::move(c));
     }

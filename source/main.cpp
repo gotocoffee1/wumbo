@@ -78,8 +78,11 @@ int main(int argc, char** argv)
         {
             std::ofstream ofstream;
             if (!outfile.empty())
-                ofstream.open(outfile, std::ios::out | std::ios::binary | std::ios::failbit | std::ios::badbit);
-
+            {
+                ofstream.open(outfile, std::ios_base::out | std::ios_base::binary);
+                if (!ofstream.is_open())
+                    throw std::system_error(errno, std::generic_category(), outfile.string());
+            }
             std::ostream& ostream = outfile.empty() ? std::cout : ofstream;
             if (text)
                 to_stream_text(ostream, result);

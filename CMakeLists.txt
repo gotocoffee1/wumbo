@@ -41,6 +41,10 @@ string(REGEX REPLACE "/showIncludes" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 string(REGEX REPLACE "/sdl" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 string(REGEX REPLACE "/std:c..17" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
+
+set(CMAKE_CXX_FLAGS "")
+set(CMAKE_C_FLAGS "")
+
 include(FetchContent)
 
 FetchContent_Declare(
