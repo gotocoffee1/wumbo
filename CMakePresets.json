@@ -36,6 +36,14 @@
       }
     },
     {
+      "name": "ccache",
+      "hidden": true,
+      "cacheVariables": {
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache"
+      }
+    },
+    {
       "name": "flags-linux",
       "hidden": true,
       "cacheVariables": {
@@ -105,6 +113,27 @@
         "std",
         "vcpkg"
       ]
+    },
+    {
+      "name": "x64-linux-gcc",
+      "inherits": [
+        "common",
+        "x64-linux",
+        "flags-linux"
+      ]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "x64-linux-gcc-debug",
+      "configurePreset": "x64-linux-gcc",
+      "configuration": "Debug"
+    },
+    {
+      "name": "x64-linux-gcc-release",
+      "configurePreset": "x64-linux-gcc",
+      "configuration": "Release",
+      "jobs": 12
     }
   ]
 }
