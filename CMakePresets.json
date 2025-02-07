@@ -112,7 +112,10 @@
       "inherits": [
         "std",
         "vcpkg"
-      ]
+      ],
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+      }
     },
     {
       "name": "x64-linux-gcc",

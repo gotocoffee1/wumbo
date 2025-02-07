@@ -8,6 +8,7 @@ pkgs.mkShell {
     ninja
     ccache
     gcc
+    clang-tools
     vcpkg
     pkg-config
   ];
