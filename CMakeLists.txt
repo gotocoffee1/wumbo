@@ -27,9 +27,8 @@ add_library(wumbo
 
 add_library(wumbo::wumbo ALIAS wumbo)
 
+find_package(pegtl CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
-find_package(pegtl REQUIRED)
-
 
 set(temp ${CMAKE_CXX_FLAGS})
 set(temp2 ${CMAKE_C_FLAGS})

@@ -20,8 +20,10 @@ pkgs.mkShell {
     ++ [
       gcc
       emscripten
+      python3
     ];
   shellHook = ''
     export VCPKG_ROOT=${pkgs.vcpkg}/share/vcpkg
+    export EMSCRIPTEN_ROOT=${pkgs.emscripten}/share/emscripten
   '';
 }
