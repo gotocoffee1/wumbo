@@ -1,46 +1,21 @@
 {
-  "version": 3,
+  "version": 8,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 14,
-    "patch": 0
+    "minor": 28
   },
+  "include": [
+    "presets/platforms.json",
+    "presets/tools.json"
+  ],
   "configurePresets": [
     {
-      "name": "vcpkg",
-      "hidden": true,
-      "toolchainFile": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-    },
-    {
-      "name": "cppcheck",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_CXX_CPPCHECK": "cppcheck;--inline-suppr"
-      }
-    },
-    {
-      "name": "clang-tidy",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_CXX_CLANG_TIDY": "clang-tidy;--header-filter=^${sourceDir}/"
-      }
-    },
-    {
       "name": "std",
-      "description": "This preset makes sure the project actually builds with at least the specified standard",
       "hidden": true,
       "cacheVariables": {
         "CMAKE_CXX_EXTENSIONS": "OFF",
         "CMAKE_CXX_STANDARD": "17",
         "CMAKE_CXX_STANDARD_REQUIRED": "ON"
-      }
-    },
-    {
-      "name": "ccache",
-      "hidden": true,
-      "cacheVariables": {
-        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
-        "CMAKE_C_COMPILER_LAUNCHER": "ccache"
       }
     },
     {
@@ -68,43 +43,7 @@
         "CMAKE_EXE_LINKER_FLAGS": "/machine:x64 /guard:cf"
       }
     },
-    {
-      "name": "wasm32-emscripten",
-      "hidden": true,
-      "cacheVariables": {
-        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSDK}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
-        "VCPKG_TARGET_TRIPLET": "wasm32-emscripten"
-      }
-    },
-    {
-      "name": "x64-linux",
-      "hidden": true,
-      "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-linux"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Linux"
-      }
-    },
-    {
-      "name": "x64-windows",
-      "hidden": true,
-      "architecture": {
-        "strategy": "external",
-        "value": "x64"
-      },
-      "cacheVariables": {
-        "VCPKG_TARGET_TRIPLET": "x64-windows-static-md"
-      },
-      "condition": {
-        "type": "equals",
-        "lhs": "${hostSystemName}",
-        "rhs": "Windows"
-      }
-    },
-    {
+        {
       "name": "common",
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build/${presetName}",
@@ -121,7 +60,15 @@
       "name": "x64-linux-gcc",
       "inherits": [
         "common",
-        "x64-linux",
+        "platform-x64-linux",
+        "flags-linux"
+      ]
+    },
+    {
+      "name": "wasm32-emscripten",
+      "inherits": [
+        "common",
+        "platform-wasm32-emscripten",
         "flags-linux"
       ]
     }

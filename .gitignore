@@ -9,4 +9,6 @@ CMakeLists.txt.user
 CMakeUserPresets.json
 archive/
 .direnv/
+.cache/
+compile_commands.json
 
