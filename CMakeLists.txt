@@ -50,19 +50,12 @@ FetchContent_Declare(
   binaryen 
   GIT_REPOSITORY https://github.com/WebAssembly/binaryen
   GIT_TAG dcc70bbfb16c2f8fce29dad94d80d1b78123655f
+  EXCLUDE_FROM_ALL
 )
-
 
 set(EMSCRIPTEN_ENABLE_WASM_EH ON CACHE BOOL "" FORCE)
 
-
-FetchContent_GetProperties(binaryen)
-if(NOT binaryen_POPULATED)
-  FetchContent_Populate(binaryen)
-
-  add_subdirectory(${binaryen_SOURCE_DIR} ${binaryen_BINARY_DIR} EXCLUDE_FROM_ALL)
-endif()
-
+FetchContent_MakeAvailable(binaryen)
 
 set(CMAKE_CXX_FLAGS ${temp})
 set(CMAKE_C_FLAGS ${temp2})

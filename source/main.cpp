@@ -18,7 +18,7 @@ extern "C"
         ast::block chunk;
 
         parse_string(std::string_view{str, size}, chunk);
-        wasm::mod wasm = wumbo::compile(chunk);
+        wasm::mod wasm = wumbo::compile(chunk, 1);
 
         return new result{to_stream_bin(wasm)};
     }

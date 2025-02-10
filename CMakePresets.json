@@ -43,7 +43,7 @@
         "CMAKE_EXE_LINKER_FLAGS": "/machine:x64 /guard:cf"
       }
     },
-        {
+    {
       "name": "common",
       "generator": "Ninja Multi-Config",
       "binaryDir": "${sourceDir}/build/${presetName}",
@@ -51,10 +51,7 @@
       "inherits": [
         "std",
         "vcpkg"
-      ],
-      "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
-      }
+      ]
     },
     {
       "name": "x64-linux-gcc",
@@ -68,8 +65,7 @@
       "name": "wasm32-emscripten",
       "inherits": [
         "common",
-        "platform-wasm32-emscripten",
-        "flags-linux"
+        "platform-wasm32-emscripten"
       ]
     }
   ],
