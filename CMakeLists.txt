@@ -75,6 +75,7 @@ add_executable(wumbo_exe source/main.cpp)
 target_link_libraries(wumbo_exe PUBLIC wumbo)
 
 if (EMSCRIPTEN)
+  set(CMAKE_EXECUTABLE_SUFFIX ".mjs")
   target_compile_options(wumbo PUBLIC
   -fwasm-exceptions)
   target_link_options(wumbo PUBLIC
@@ -83,6 +84,9 @@ if (EMSCRIPTEN)
   #"SHELL:-s ALLOW_MEMORY_GROWTH"
   #"SHELL:-s  EXIT_RUNTIME=0"
   "SHELL:-sEXPORTED_RUNTIME_METHODS=cwrap"
+  "SHELL:-sMODULARIZE=1"
+  "SHELL:-sEXPORT_ES6=1"
+  "SHELL:-sEXPORT_NAME=$<TARGET_NAME:wumbo>"
   --no-entry
   -fwasm-exceptions)
 else()

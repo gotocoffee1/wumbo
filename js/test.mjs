@@ -1,0 +1,6 @@
+import { load } from "./load.mjs";
+
+//console.time("lua");
+const f = await load('print("test")');
+//console.timeEnd("lua");
+f();

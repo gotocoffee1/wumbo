@@ -1,0 +1,52 @@
+const instantiateBuffer = async (buffer) => {
+  const { module, instance } = await WebAssembly.instantiate(
+    buffer,
+    importObject,
+  );
+  const { start } = instance.exports;
+  return start;
+};
+
+const importObject = {
+  print: {
+    value: (arg) => {
+      console.log(arg);
+      //ouput.innerHTML += arg + "<br />";
+    },
+    string: (arg) => {
+      arg = new TextDecoder().decode(arg);
+      console.log(arg);
+      //ouput.innerHTML += arg + "<br />";
+    },
+    array: (size) => new Uint8Array(size),
+    set_array: (array, index, value) => (array[index] = value),
+  },
+  load: {
+    load: instantiateBuffer,
+  },
+  string: {
+    to_int: () => {},
+    to_float: () => {},
+  },
+};
+
+import wumbo from "./build/web/Release/wumbo.mjs";
+//fetch("build/dev/Debug/out.wasm", { cache: "no-store" })
+const instance = await wumbo();
+
+const load_lua = instance.cwrap("load_lua", "number", ["array", "number"]);
+const clean_up = instance.cwrap("clean_up", "void", ["number"]);
+const get_size = instance.cwrap("get_size", "number", ["number"]);
+const get_data = instance.cwrap("get_data", "number", ["number"]);
+
+export const load = async (txt) => {
+  const bytes = new TextEncoder().encode(txt);
+  const result = load_lua(bytes, bytes.length);
+  const wasm_bytes = get_data(result);
+  const wasm_size = get_size(result);
+
+  const buffer = instance.HEAPU8.subarray(wasm_bytes, wasm_bytes + wasm_size);
+  const start = await instantiateBuffer(buffer);
+  clean_up(result);
+  return start;
+};
