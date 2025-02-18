@@ -1,3 +1,7 @@
+import wumbo from "./wumbo.mjs";
+
+export const newInstance = async(override)=>{
+
 const instantiateBuffer = async (buffer) => {
   const { module, instance } = await WebAssembly.instantiate(
     buffer,
@@ -11,12 +15,10 @@ const importObject = {
   print: {
     value: (arg) => {
       console.log(arg);
-      //ouput.innerHTML += arg + "<br />";
     },
     string: (arg) => {
       arg = new TextDecoder().decode(arg);
       console.log(arg);
-      //ouput.innerHTML += arg + "<br />";
     },
     array: (size) => new Uint8Array(size),
     set_array: (array, index, value) => (array[index] = value),
@@ -30,8 +32,10 @@ const importObject = {
   },
 };
 
-import wumbo from "./build/web/Release/wumbo.mjs";
-//fetch("build/dev/Debug/out.wasm", { cache: "no-store" })
+if (override) {
+    Object.entries(importObject).forEach(([key, value]) => { importObject[key] = {...value, ...override[key]} });
+}
+
 const instance = await wumbo();
 
 const load_lua = instance.cwrap("load_lua", "number", ["array", "number"]);
@@ -39,7 +43,7 @@ const clean_up = instance.cwrap("clean_up", "void", ["number"]);
 const get_size = instance.cwrap("get_size", "number", ["number"]);
 const get_data = instance.cwrap("get_data", "number", ["number"]);
 
-export const load = async (txt) => {
+return async (txt) => {
   const bytes = new TextEncoder().encode(txt);
   const result = load_lua(bytes, bytes.length);
   const wasm_bytes = get_data(result);
@@ -49,4 +53,5 @@ export const load = async (txt) => {
   const start = await instantiateBuffer(buffer);
   clean_up(result);
   return start;
+};
 };

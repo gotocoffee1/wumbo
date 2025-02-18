@@ -13,8 +13,6 @@
 </body>
 
 <script>
-
-
     const result = document.getElementById("result");
     const error = document.getElementById("error");
     const ouput = document.getElementById("ouput");
@@ -22,8 +20,19 @@
     // py -m http.server
     //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
 </script>
-<script src="load.mjs">
+<script type="module">
+    import { newInstance } from "./load.mjs";
+    const load = await newInstance({
+        print: {
+            string: (arg) =>{
+                arg = new TextDecoder().decode(arg);
+                console.log(arg);
+                ouput.innerHTML += arg + "<br />";
+            },
+        },
+    });
+    const f = await load('print("qwe")');
+    f();
 </script>
-
 
 </html>
