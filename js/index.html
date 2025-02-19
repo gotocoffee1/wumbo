@@ -4,6 +4,11 @@
 <link rel="icon" href="data:,">
 
 <body>
+    
+    <input id="run" type="button" value="run" />
+    <br />
+    <textarea id="code" name="code" rows="4" cols="50"></textarea>
+
     <div id="result"></div>
     <hr />
     <div id="ouput"></div>
@@ -16,6 +21,8 @@
     const result = document.getElementById("result");
     const error = document.getElementById("error");
     const ouput = document.getElementById("ouput");
+    const run = document.getElementById("run");
+    const code = document.getElementById("code");
 
     // py -m http.server
     //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
@@ -31,8 +38,10 @@
             },
         },
     });
-    const f = await load('print("qwe")');
-    f();
+    run.onclick = async () =>{
+        const f = await load(code.value);
+        f();
+    };
 </script>
 
 </html>
