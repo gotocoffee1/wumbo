@@ -2,44 +2,62 @@
 <html>
 <title>wumbo</title>
 <link rel="icon" href="data:,">
-
+<link rel="stylesheet" href="index.css">
 <body>
-    
-    <input id="run" type="button" value="run" />
-    <br />
-    <textarea id="code" name="code" rows="4" cols="50"></textarea>
-
-    <div id="result"></div>
-    <hr />
-    <div id="ouput"></div>
-    <hr />
-    <div id="error"></div>
+        
+    <div class="container column">
+        <div class="header">
+            <input id="run" type="button" value="run" />
+        </div>
+        <div class="row fill-space">
+            <div id="editor-lua" class="editor fill-space">print("hello world")</div>
+            <div id="editor-console" class="editor fill-space"></div>
+            <div id="editor-wat" class="editor fill-space"></div>
+        </div>
+    </div>
 
 </body>
-
-<script>
-    const result = document.getElementById("result");
-    const error = document.getElementById("error");
-    const ouput = document.getElementById("ouput");
-    const run = document.getElementById("run");
-    const code = document.getElementById("code");
-
+<script type="module">
     // py -m http.server
     //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
-</script>
-<script type="module">
+    import ace from 'https://cdn.jsdelivr.net/npm/ace-builds@1.38.0/+esm'
+
+    ace.config.set('basePath', 'https://cdn.jsdelivr.net/npm/ace-builds@1.38.0/src-min-noconflict');
+
+    const initEditor = (editor) =>{
+        const theme = "ace/theme/gruvbox";
+        editor.setTheme(theme);
+        editor.setOption("showPrintMargin", false);
+    };
+
+    const editorLua = ace.edit("editor-lua");
+    editorLua.session.setMode("ace/mode/lua");
+    initEditor(editorLua);
+
+    const editorConsole = ace.edit("editor-console");
+    editorConsole.setReadOnly(true);
+    initEditor(editorConsole);
+
+    const editorWat = ace.edit("editor-wat");
+    initEditor(editorWat);
+
     import { newInstance } from "./load.mjs";
     const load = await newInstance({
         print: {
             string: (arg) =>{
                 arg = new TextDecoder().decode(arg);
                 console.log(arg);
-                ouput.innerHTML += arg + "<br />";
+                const session = editorConsole.session;
+                session.insert({
+                    row: session.getLength(),
+                    column: 0,
+                }, arg + "\n")
             },
         },
     });
     run.onclick = async () =>{
-        const f = await load(code.value);
+        editorConsole.setValue("");
+        const f = await load(editorLua.getValue());
         f();
     };
 </script>
