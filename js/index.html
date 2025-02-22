@@ -57,7 +57,8 @@
     });
     run.onclick = async () =>{
         editorConsole.setValue("");
-        const f = await load(editorLua.getValue());
+        const [f, wat] = await load(editorLua.getValue());
+        editorWat.setValue(wat); 
         f();
     };
 </script>

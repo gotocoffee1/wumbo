@@ -13,14 +13,14 @@ void to_stream_text(std::ostream& f, const wasm::mod& m);
 #include <emscripten.h>
 extern "C"
 {
-    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size)
+    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size, bool return_text)
     {
         ast::block chunk;
 
         parse_string(std::string_view{str, size}, chunk);
         wasm::mod wasm = wumbo::compile(chunk, 1);
 
-        return new result{to_stream_bin(wasm)};
+        return new result{to_stream_bin(wasm, wat::stack)};
     }
 
     EMSCRIPTEN_KEEPALIVE void clean_up(result* ptr)
@@ -36,6 +36,16 @@ extern "C"
     EMSCRIPTEN_KEEPALIVE void* get_data(result* ptr)
     {
         return ptr->data.get();
+    }
+
+    EMSCRIPTEN_KEEPALIVE char* get_source_map(result* ptr)
+    {
+        return ptr->source_map.get();
+    }
+
+    EMSCRIPTEN_KEEPALIVE char* get_wat(result* ptr)
+    {
+        return ptr->wat.get();
     }
 }
 

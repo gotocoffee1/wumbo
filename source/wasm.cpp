@@ -10,18 +10,32 @@ void deleter::operator()(void* ptr)
     free(ptr);
 }
 
-result to_stream_bin(const wasm::mod& m)
+result to_stream_bin(const wasm::mod& m, wat mode)
 {
     auto mod = reinterpret_cast<BinaryenModuleRef>(m.impl.get());
     auto res = BinaryenModuleAllocateAndWrite(mod, nullptr);
+   
+    char* txt = nullptr;
+    switch (mode) {
+        default:
+        break;
+        case wat::stack:
+        txt = BinaryenModuleAllocateAndWriteStackIR(mod);
+        break;
+        case wat::function:
+        //txt = BinaryenModuleAllocate(mod);
+        break;
+    }
+
     return {std::unique_ptr<void, deleter>{res.binary},
             res.binaryBytes,
-            std::unique_ptr<char, deleter>{res.sourceMap}};
+            std::unique_ptr<char, deleter>{res.sourceMap},
+            std::unique_ptr<char, deleter>{txt}};
 }
 
 void to_stream_bin(std::ostream& f, const wasm::mod& m)
 {
-    auto [data, size, source_map] = to_stream_bin(m);
+    auto [data, size, source_map, txt] = to_stream_bin(m, wat::none);
     f.write(reinterpret_cast<char*>(data.get()), static_cast<std::streamsize>(size));
 }
 

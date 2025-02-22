@@ -31,6 +31,14 @@ struct result
     std::unique_ptr<void, deleter> data;
     size_t size;
     std::unique_ptr<char, deleter>  source_map;
+    std::unique_ptr<char, deleter>  wat;
 };
 
-result to_stream_bin(const wasm::mod& m);
+enum class wat
+{
+    none = 0,
+    stack = 1,
+    function = 2,
+};
+
+result to_stream_bin(const wasm::mod& m, wat mode);

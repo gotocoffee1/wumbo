@@ -43,16 +43,19 @@ export const newInstance = async (override) => {
   const clean_up = instance.cwrap("clean_up", "void", ["number"]);
   const get_size = instance.cwrap("get_size", "number", ["number"]);
   const get_data = instance.cwrap("get_data", "number", ["number"]);
+  const get_wat = instance.cwrap("get_wat", "string", ["number"]);
+  const get_source_map = instance.cwrap("get_source_map", "string", ["number"]);
 
   return async (txt) => {
     const bytes = new TextEncoder().encode(txt);
     const result = load_lua(bytes, bytes.length);
     const wasm_bytes = get_data(result);
     const wasm_size = get_size(result);
+    const wat = get_wat(result);
 
     const buffer = instance.HEAPU8.subarray(wasm_bytes, wasm_bytes + wasm_size);
     const start = await instantiateBuffer(buffer);
     clean_up(result);
-    return start;
+    return [start, wat];
   };
 };
