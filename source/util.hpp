@@ -1,5 +1,7 @@
 #pragma once
 
+namespace wumbo
+{
 template<typename... Func>
 struct overload : Func...
 {
@@ -8,3 +10,4 @@ struct overload : Func...
 
 template<typename... Func>
 overload(Func...) -> overload<Func...>;
+}

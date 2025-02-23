@@ -71,7 +71,11 @@ target_include_directories(wumbo PRIVATE ${binaryen_SOURCE_DIR}/src)
 target_include_directories(wumbo PRIVATE source)
 
 
-add_executable(wumbo_exe source/main.cpp)
+if (EMSCRIPTEN)
+  add_executable(wumbo_exe source/jsapi.cpp)
+else()
+  add_executable(wumbo_exe source/main.cpp)
+endif()
 target_link_libraries(wumbo_exe PUBLIC wumbo)
 
 if (EMSCRIPTEN)

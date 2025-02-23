@@ -5,51 +5,9 @@
 #include <ostream>
 #include <string_view>
 
-bool parse_string(std::string_view string, ast::block& state);
 void to_stream_bin(std::ostream& f, const wasm::mod& m);
 void to_stream_text(std::ostream& f, const wasm::mod& m);
 
-#if defined(__EMSCRIPTEN__)
-#include <emscripten.h>
-extern "C"
-{
-    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size, bool return_text)
-    {
-        ast::block chunk;
-
-        parse_string(std::string_view{str, size}, chunk);
-        wasm::mod wasm = wumbo::compile(chunk, 1);
-
-        return new result{to_stream_bin(wasm, wat::stack)};
-    }
-
-    EMSCRIPTEN_KEEPALIVE void clean_up(result* ptr)
-    {
-        delete ptr;
-    }
-
-    EMSCRIPTEN_KEEPALIVE size_t get_size(result* ptr)
-    {
-        return ptr->size;
-    }
-
-    EMSCRIPTEN_KEEPALIVE void* get_data(result* ptr)
-    {
-        return ptr->data.get();
-    }
-
-    EMSCRIPTEN_KEEPALIVE char* get_source_map(result* ptr)
-    {
-        return ptr->source_map.get();
-    }
-
-    EMSCRIPTEN_KEEPALIVE char* get_wat(result* ptr)
-    {
-        return ptr->wat.get();
-    }
-}
-
-#else
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -108,4 +66,3 @@ int main(int argc, char** argv)
     return EXIT_SUCCESS;
 }
 
-#endif

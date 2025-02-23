@@ -6,13 +6,13 @@
 #define TAO_PEGTL_SRC_EXAMPLES_PEGTL_LUA53_HPP
 
 #if !defined(__cpp_exceptions)
-#error "Exception support required for lua53.hpp"
+#error "Exception support required for parser.hpp"
 #else
 
 #include <tao/pegtl.hpp>
 #include <tao/pegtl/contrib/raw_string.hpp>
 
-namespace lua53
+namespace wumbo::lua53
 {
 using namespace TAO_PEGTL_NAMESPACE;
 

@@ -7,7 +7,7 @@
 
 #include <charconv>
 
-namespace lua53
+namespace wumbo::lua53
 {
 using namespace TAO_PEGTL_NAMESPACE;
 
@@ -33,7 +33,7 @@ struct fill_expression : change_states<State>
     template<typename ParseInput>
     static void success(const ParseInput&, State& c, ast::expr_temp& p)
     {
-        using s = std::conditional_t<std::is_same_v<State, ast::prefixexp>, ast::box<State>, State>;
+        using s = std::conditional_t<std::is_same_v<State, ast::prefixexp>, box<State>, State>;
 
         p.list.emplace_back().inner.emplace<s>(std::move(c));
     }
@@ -528,7 +528,7 @@ struct operation : change_state<ast::expr_temp>
         {
             if (c.u_op)
             {
-                auto& temp = *p.inner.emplace<ast::box<ast::un_operation>>();
+                auto& temp = *p.inner.emplace<box<ast::un_operation>>();
                 temp.op    = *c.u_op;
                 temp.rhs   = std::move(c.list[0]);
             }
@@ -537,14 +537,14 @@ struct operation : change_state<ast::expr_temp>
         }
         else if (c.list.size() == 2)
         {
-            auto& temp = *p.inner.emplace<ast::box<ast::bin_operation>>();
+            auto& temp = *p.inner.emplace<box<ast::bin_operation>>();
             temp.op    = c.b_op[0];
             temp.lhs   = std::move(c.list[0]);
             temp.rhs   = std::move(c.list[1]);
         }
         else
         {
-            auto& temp = *p.inner.emplace<ast::box<ast::bin_operation>>();
+            auto& temp = *p.inner.emplace<box<ast::bin_operation>>();
             temp.op    = c.b_op.back();
             temp.rhs   = std::move(c.list.back());
             c.list.pop_back();

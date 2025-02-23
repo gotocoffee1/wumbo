@@ -2,7 +2,8 @@
 
 #include "action.hpp"
 
-
+namespace wumbo
+{
 bool parse_stream(std::istream& stream, ast::block& state)
 {
     TAO_PEGTL_NAMESPACE::istream_input in(stream, 40, "");
@@ -39,4 +40,5 @@ bool parse_string(std::string_view string, ast::block& state)
     //}
 
     return TAO_PEGTL_NAMESPACE::parse<lua53::grammar, lua53::action>(in, state);
+}
 }

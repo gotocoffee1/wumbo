@@ -47,6 +47,7 @@ export const newInstance = async (override) => {
   const get_source_map = instance.cwrap("get_source_map", "string", ["number"]);
 
   return async (txt) => {
+    try {
     const bytes = new TextEncoder().encode(txt);
     const result = load_lua(bytes, bytes.length);
     const wasm_bytes = get_data(result);
@@ -57,5 +58,8 @@ export const newInstance = async (override) => {
     const start = await instantiateBuffer(buffer);
     clean_up(result);
     return [start, wat];
+    } catch (e) {
+      console.error(e.message)
+    }
   };
 };

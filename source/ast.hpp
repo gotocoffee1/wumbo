@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-namespace ast
+namespace wumbo::ast
 {
 
 using name_t    = std::string;
@@ -284,7 +284,7 @@ struct statement
 #include <ostream>
 #include <string_view>
 
-namespace ast
+namespace wumbo::ast
 {
 struct printer
 {

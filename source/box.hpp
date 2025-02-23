@@ -2,7 +2,7 @@
 
 #include <memory>
 
-namespace ast
+namespace wumbo
 {
 template<typename T, typename Deleter = std::default_delete<T>>
 class box
@@ -32,13 +32,13 @@ class box
     }
 
     box(box&& other)
-        : box(std::move(*other._impl))
+        : _impl(std::move(other._impl))
     {
     }
 
     box& operator=(box&& other)
     {
-        *_impl = std::move(*other._impl);
+        _impl = std::move(other._impl);
         return *this;
     }
 

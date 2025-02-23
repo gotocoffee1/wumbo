@@ -4,47 +4,58 @@
 
 #include "binaryen-c.h"
 
-
-void deleter::operator()(void* ptr)
+namespace wumbo
 {
-    free(ptr);
+
+void deleter::operator()(const void* ptr)
+{
+    free(const_cast<void*>(ptr));
 }
 
-result to_stream_bin(const wasm::mod& m, wat mode)
+std::tuple<
+    std::unique_ptr<const void, deleter>,
+    size_t,
+    c_str>
+to_bin(const wasm::mod& m)
 {
     auto mod = reinterpret_cast<BinaryenModuleRef>(m.impl.get());
     auto res = BinaryenModuleAllocateAndWrite(mod, nullptr);
-   
-    char* txt = nullptr;
-    switch (mode) {
-        default:
-        break;
-        case wat::stack:
+
+    return {
+        std::unique_ptr<void, deleter>{res.binary},
+        res.binaryBytes,
+        c_str{res.sourceMap},
+    };
+}
+
+c_str to_txt(const wasm::mod& m, wat mode)
+{
+    auto mod = reinterpret_cast<BinaryenModuleRef>(m.impl.get());
+    const char* txt;
+    switch (mode)
+    {
+    case wat::stack:
         txt = BinaryenModuleAllocateAndWriteStackIR(mod);
         break;
-        case wat::function:
-        //txt = BinaryenModuleAllocate(mod);
+    case wat::function:
+        txt = BinaryenModuleAllocateAndWriteText(mod);
         break;
+    default:
+        return nullptr;
     }
-
-    return {std::unique_ptr<void, deleter>{res.binary},
-            res.binaryBytes,
-            std::unique_ptr<char, deleter>{res.sourceMap},
-            std::unique_ptr<char, deleter>{txt}};
+    return c_str{txt};
 }
 
 void to_stream_bin(std::ostream& f, const wasm::mod& m)
 {
-    auto [data, size, source_map, txt] = to_stream_bin(m, wat::none);
-    f.write(reinterpret_cast<char*>(data.get()), static_cast<std::streamsize>(size));
+    auto [data, size, source_map] = to_bin(m);
+    f.write(reinterpret_cast<const char*>(data.get()), static_cast<std::streamsize>(size));
 }
 
 void to_stream_text(std::ostream& f, const wasm::mod& m)
 {
-    auto mod = reinterpret_cast<BinaryenModuleRef>(m.impl.get());
-    auto res = BinaryenModuleAllocateAndWriteStackIR(mod);
-    f << res;
-    free(res);
+    auto txt = to_txt(m, wat::stack);
+    f << *txt;
 }
 
 namespace wasm
@@ -60,3 +71,4 @@ void mod::deleter::operator()(void* ptr)
     BinaryenModuleDispose(reinterpret_cast<BinaryenModuleRef>(ptr));
 }
 } // namespace wasm
+} // namespace wumbo

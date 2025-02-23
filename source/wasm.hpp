@@ -2,8 +2,8 @@
 
 #include <memory>
 
-
-
+namespace wumbo
+{
 namespace wasm
 {
 
@@ -19,26 +19,24 @@ struct mod
 
 } // namespace wasm
 
-
 struct deleter
 {
-    void operator()(void*);
-};
-
-
-struct result
-{
-    std::unique_ptr<void, deleter> data;
-    size_t size;
-    std::unique_ptr<char, deleter>  source_map;
-    std::unique_ptr<char, deleter>  wat;
+    void operator()(const void*);
 };
 
 enum class wat
 {
-    none = 0,
-    stack = 1,
+    stack    = 1,
     function = 2,
 };
 
-result to_stream_bin(const wasm::mod& m, wat mode);
+
+using c_str = std::unique_ptr<const char, deleter>;
+
+std::tuple<
+    std::unique_ptr<const void, deleter>,
+    size_t,
+    c_str> to_bin(const wasm::mod& m);
+
+c_str to_txt(const wasm::mod& m, wat mode);
+} // namespace wumbo

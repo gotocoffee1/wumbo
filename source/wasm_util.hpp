@@ -2,6 +2,11 @@
 
 #include "binaryen-c.h"
 
+#include <array>
+#include <vector>
+
+
+
 namespace wumbo
 {
 
