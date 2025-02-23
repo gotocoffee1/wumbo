@@ -11,4 +11,5 @@ archive/
 .direnv/
 .cache/
 compile_commands.json
+js/wumbo.*
 

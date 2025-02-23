@@ -5,8 +5,11 @@
 #include <ostream>
 #include <string_view>
 
+namespace wumbo
+{
 void to_stream_bin(std::ostream& f, const wasm::mod& m);
 void to_stream_text(std::ostream& f, const wasm::mod& m);
+} // namespace wumbo
 
 #include <filesystem>
 #include <fstream>
@@ -14,11 +17,16 @@ void to_stream_text(std::ostream& f, const wasm::mod& m);
 
 #include <CLI/CLI.hpp>
 
+namespace wumbo
+{
 bool parse_stream(std::istream& stream, ast::block& state);
 bool parse_file(const std::filesystem::path& path, ast::block& state);
+} // namespace wumbo
 
 int main(int argc, char** argv)
 {
+    using namespace wumbo;
+
     CLI::App app{"A Lua to WebAssembly compiler", "wumbo"};
 
     std::filesystem::path infile;
@@ -65,4 +73,3 @@ int main(int argc, char** argv)
     }
     return EXIT_SUCCESS;
 }
-

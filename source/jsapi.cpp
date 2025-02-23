@@ -85,4 +85,9 @@ extern "C"
         ptr->wat = to_txt(ptr->mod, wat::stack);
         return ptr->wat.get();
     }
+
+    EMSCRIPTEN_KEEPALIVE const char* get_error(result* ptr)
+    {
+        return ptr->error.c_str();
+    }
 }

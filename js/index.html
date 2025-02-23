@@ -4,7 +4,6 @@
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="index.css">
 <body>
-        
     <div class="container column">
         <div class="header">
             <input id="run" type="button" value="run" />
@@ -15,52 +14,10 @@
             <div id="editor-wat" class="editor fill-space"></div>
         </div>
     </div>
-
 </body>
-<script type="module">
+<script type="module" src="index.mjs">
     // py -m http.server
     //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
-    import ace from 'https://cdn.jsdelivr.net/npm/ace-builds@1.38.0/+esm'
-
-    ace.config.set('basePath', 'https://cdn.jsdelivr.net/npm/ace-builds@1.38.0/src-min-noconflict');
-
-    const initEditor = (editor) =>{
-        const theme = "ace/theme/gruvbox";
-        editor.setTheme(theme);
-        editor.setOption("showPrintMargin", false);
-    };
-
-    const editorLua = ace.edit("editor-lua");
-    editorLua.session.setMode("ace/mode/lua");
-    initEditor(editorLua);
-
-    const editorConsole = ace.edit("editor-console");
-    editorConsole.setReadOnly(true);
-    initEditor(editorConsole);
-
-    const editorWat = ace.edit("editor-wat");
-    initEditor(editorWat);
-
-    import { newInstance } from "./load.mjs";
-    const load = await newInstance({
-        print: {
-            string: (arg) =>{
-                arg = new TextDecoder().decode(arg);
-                console.log(arg);
-                const session = editorConsole.session;
-                session.insert({
-                    row: session.getLength(),
-                    column: 0,
-                }, arg + "\n")
-            },
-        },
-    });
-    run.onclick = async () =>{
-        editorConsole.setValue("");
-        const [f, wat] = await load(editorLua.getValue());
-        editorWat.setValue(wat); 
-        f();
-    };
 </script>
-
 </html>
+
