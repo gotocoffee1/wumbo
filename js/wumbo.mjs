@@ -1,0 +1,1 @@
+../build/web/Release/wumbo.mjs
