@@ -6,7 +6,11 @@
 <body>
     <div class="container column">
         <div class="header">
-            <input id="run" type="button" value="run" />
+            <input type="button" id="run" value="run" />
+            <input type="checkbox" id="watFormat" checked />
+            <label for="watFormat">Stack IR</label>
+            <input type="checkbox" id="optimize" checked />
+            <label for="optimize">Optimize</label>
         </div>
         <div class="row fill-space">
             <div id="editor-lua" class="editor fill-space">print("hello world")</div>
@@ -15,9 +19,6 @@
         </div>
     </div>
 </body>
-<script type="module" src="index.mjs">
-    // py -m http.server
-    //py -m webbrowser -t "http://localhost:8000"; py -m http.server;
-</script>
+<script type="module" src="index.mjs"></script>
 </html>
 

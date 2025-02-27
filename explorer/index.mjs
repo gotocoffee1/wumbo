@@ -30,6 +30,7 @@ const appendConsole = (arg) => {
 };
 
 const editorWat = ace.edit("editor-wat");
+editorWat.setReadOnly(true);
 initEditor(editorWat);
 
 import { newInstance } from "./wumbo.mjs";
@@ -42,10 +43,19 @@ const load = await newInstance({
     },
   },
 });
+
+const optimize = document.getElementById("optimize");
+const watFormat = document.getElementById("watFormat");
+
 run.onclick = async () => {
   editorConsole.setValue("");
+  editorWat.setValue("");
   try {
-    const [f, wat] = await load(editorLua.getValue());
+    const [f, wat] = await load(
+      editorLua.getValue(),
+      optimize.checked,
+      watFormat.checked,
+    );
     editorWat.setValue(wat);
     f();
   } catch (e) {
