@@ -22,14 +22,14 @@ struct result
 extern "C"
 {
     using namespace wumbo;
-    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size)
+    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size, uint32_t optimize)
     {
         auto res = new result{};
         try
         {
             ast::block chunk;
             parse_string(std::string_view{str, size}, chunk);
-            res->mod = wumbo::compile(chunk, 1);
+            res->mod = wumbo::compile(chunk, optimize);
         }
         catch (const std::exception& e)
         {
@@ -80,9 +80,9 @@ extern "C"
         return ptr->source_map.get();
     }
 
-    EMSCRIPTEN_KEEPALIVE const char* get_wat(result* ptr)
+    EMSCRIPTEN_KEEPALIVE const char* get_wat(result* ptr, int format)
     {
-        ptr->wat = to_txt(ptr->mod, wat::stack);
+        ptr->wat = to_txt(ptr->mod, static_cast<wat>(format));
         return ptr->wat.get();
     }
 

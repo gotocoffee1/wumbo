@@ -26,8 +26,8 @@ struct deleter
 
 enum class wat
 {
+    function = 0,
     stack    = 1,
-    function = 2,
 };
 
 
