@@ -1,5 +1,3 @@
-import wumbo from "./wumbo.mjs";
-
 export const newInstance = async (override) => {
   const instantiateBuffer = async (buffer) => {
     const { module, instance } = await WebAssembly.instantiate(

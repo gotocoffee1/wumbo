@@ -91,6 +91,7 @@ if (EMSCRIPTEN)
   "SHELL:-sMODULARIZE=1"
   "SHELL:-sEXPORT_ES6=1"
   "SHELL:-sEXPORT_NAME=$<TARGET_NAME:wumbo>"
+  --extern-post-js "${CMAKE_CURRENT_LIST_DIR}/js/post.mjs"
   --no-entry
   -fwasm-exceptions)
 else()
