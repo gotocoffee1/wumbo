@@ -43,6 +43,7 @@ std::vector<T> append(std::vector<T>&& self, U&& other)
 struct utils
 {
     BinaryenModuleRef mod;
+    BinaryenModuleRef runtime;
 
     expr_ref const_i32(int32_t num)
     {

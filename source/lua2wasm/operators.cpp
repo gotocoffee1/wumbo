@@ -100,9 +100,9 @@ void compiler::make_bin_operation()
             std::tuple{"*modulo", &compiler::rem_int, &compiler::div_num},
         };
 
-        for (auto& [function, int_op, num_op] : functions)
+        for (auto [function, int_op, num_op] : functions)
         {
-            make_func(function, casts, [&](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
+            make_func(function, casts, [&, int_op = int_op, num_op = num_op](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
                       {
                           switch (left_type)
                           {
@@ -143,9 +143,9 @@ void compiler::make_bin_operation()
             std::tuple{"*binary_left_shift", &compiler::shl_int},
         };
 
-        for (auto& [function, int_op] : bitop)
+        for (auto [function, int_op] : bitop)
         {
-            make_func(function, casts, [&](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
+            make_func(function, casts, [&, int_op = int_op](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
                       {
                           switch (left_type)
                           {
@@ -187,9 +187,9 @@ void compiler::make_bin_operation()
             std::tuple{"*greater_or_equal", &compiler::ge_int, &compiler::ge_num},
         };
 
-        for (auto& [function, int_op, num_op] : relational)
+        for (auto [function, int_op, num_op] : relational)
         {
-            make_func(function, casts, [&](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
+            make_func(function, casts, [&, int_op = int_op, num_op = num_op](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
                       {
                           switch (left_type)
                           {
