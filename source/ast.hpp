@@ -1,7 +1,7 @@
 #pragma once
 
 #include "box.hpp"
-#include <cstdint>
+#include "type.hpp"
 #include <optional>
 #include <string>
 #include <variant>

@@ -1,6 +1,7 @@
 #include "runtime.hpp"
 
 #include "binaryen-c.h"
+#include "type.hpp"
 #include "wasm_util.hpp"
 
 namespace wumbo
@@ -186,7 +187,7 @@ void runtime::func_table_get()
         };
 
         return BinaryenAddFunction(mod,
-                                   (std::string("*table_set_") + name).c_str(),
+                                   ("*table_set_"s + name).c_str(),
                                    BinaryenTypeCreate(std::data(params), std::size(params)),
                                    BinaryenTypeNone(),
                                    std::data(locals),
@@ -244,8 +245,10 @@ void runtime::func_table_get()
             anyref(),
         };
 
+        if (export_functions)
+            export_func(functions::table_get);
         BinaryenAddFunction(mod,
-                            "*table_get",
+                            functions::table_get,
                             BinaryenTypeCreate(std::data(params), std::size(params)),
                             anyref(),
                             nullptr,

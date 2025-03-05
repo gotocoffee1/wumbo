@@ -19,7 +19,7 @@ expr_ref compiler::find_bucket(expr_ref table, expr_ref hash)
 
 expr_ref compiler::table_get(expr_ref table, expr_ref key)
 {
-    return make_call("*table_get",
+    return make_call(functions::table_get,
                      std::array{
                          table,
                          key,
@@ -29,7 +29,7 @@ expr_ref compiler::table_get(expr_ref table, expr_ref key)
 
 expr_ref compiler::table_set(expr_ref table, expr_ref key, expr_ref value)
 {
-    return make_call("*table_set", std::array{
+    return make_call(functions::table_set, std::array{
                                        table,
                                        key,
                                        value,

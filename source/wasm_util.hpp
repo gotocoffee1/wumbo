@@ -9,6 +9,11 @@
 
 namespace wumbo
 {
+namespace functions
+{
+    constexpr const char* table_get = "*table_get";
+    constexpr const char* table_set = "*table_set";
+};
 
 enum class value_type
 {
@@ -43,7 +48,11 @@ std::vector<T> append(std::vector<T>&& self, U&& other)
 struct utils
 {
     BinaryenModuleRef mod;
-    BinaryenModuleRef runtime;
+
+    void export_func(const char* internal, const char* external = nullptr)
+    {
+        BinaryenAddFunctionExport(mod, internal, external ? external : internal);
+    }
 
     expr_ref const_i32(int32_t num)
     {
@@ -143,6 +152,11 @@ struct utils
 
 struct ext_types : utils
 {
+    void import_func(const char* name, const char* module_name = "runtime")
+    {
+        BinaryenAddFunctionImport(mod, name, module_name, name, BinaryenType params, BinaryenType results);
+    }
+    
     static constexpr size_t type_count = 12;
 
     BinaryenType types[type_count];
