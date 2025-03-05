@@ -5,7 +5,7 @@
 #include <array>
 #include <vector>
 
-
+#include "util.hpp"
 
 namespace wumbo
 {

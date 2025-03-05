@@ -1,6 +1,7 @@
 #include "lua2wasm.hpp"
 
 #include "lua2wasm/compiler.hpp"
+#include "lua2wasm/runtime.hpp"
 
 namespace wumbo
 {
@@ -11,7 +12,8 @@ wasm::mod compile(const block& chunk, uint32_t optimize)
     compiler c{mod};
     c.build_types();
     c.convert(chunk); // remove
-
+    runtime r{mod};
+    //r.build();
     //c.convert();
     //BinaryenSetStart(mod, v);
     //BinaryenAddFunctionExport(mod, "convert", "start");

@@ -837,8 +837,6 @@ struct compiler : ext_types
 
     expr_ref table_set(expr_ref table, expr_ref key, expr_ref value);
 
-    BinaryenFunctionRef compare(const char* name, value_type vtype);
-    void func_table_get();
     expr_ref operator()(const table_constructor& p);
 
     expr_ref call(expr_ref func, expr_ref args);
@@ -875,7 +873,6 @@ struct compiler : ext_types
 
     auto convert(const block& chunk)
     {
-        func_table_get();
         to_bool();
         make_un_operation();
         make_bin_operation();

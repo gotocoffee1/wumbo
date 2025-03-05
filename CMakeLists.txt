@@ -18,6 +18,7 @@ add_library(wumbo
   "source/lua2wasm.cpp"
   "source/wasm.cpp"
   "source/lua2wasm/locals.cpp"
+  "source/lua2wasm/runtime.cpp"
   "source/lua2wasm/assignment_call.cpp"
   "source/lua2wasm/expression.cpp"
   "source/lua2wasm/table.cpp"
