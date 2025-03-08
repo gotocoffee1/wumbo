@@ -9,11 +9,18 @@
 
 namespace wumbo
 {
-namespace functions
+
+template<typename... T>
+auto create_type(T&&... types)
 {
-    constexpr const char* table_get = "*table_get";
-    constexpr const char* table_set = "*table_set";
-};
+    std::array t{types...};
+    return BinaryenTypeCreate(std::data(t), std::size(t));
+}
+
+static BinaryenType anyref()
+{
+    return BinaryenTypeAnyref();
+}
 
 enum class value_type
 {
@@ -129,11 +136,6 @@ struct utils
         return BinaryenReturn(mod, value);
     }
 
-    static BinaryenType anyref()
-    {
-        return BinaryenTypeAnyref();
-    }
-
     expr_ref resize_array(size_t new_array, BinaryenType type, expr_ref old_array, expr_ref grow, bool move_front = false)
     {
         return BinaryenArrayCopy(mod,
@@ -152,11 +154,11 @@ struct utils
 
 struct ext_types : utils
 {
-    void import_func(const char* name, const char* module_name = "runtime")
+    void import_func(const char* name, BinaryenType params, BinaryenType results, const char* module_name = "runtime")
     {
-        BinaryenAddFunctionImport(mod, name, module_name, name, BinaryenType params, BinaryenType results);
+        BinaryenAddFunctionImport(mod, name, module_name, name, params, results);
     }
-    
+
     static constexpr size_t type_count = 12;
 
     BinaryenType types[type_count];

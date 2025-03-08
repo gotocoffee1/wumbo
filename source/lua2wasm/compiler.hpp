@@ -8,6 +8,7 @@
 #include "ast.hpp"
 #include "util.hpp"
 #include "wasm_util.hpp"
+#include "runtime.hpp"
 
 namespace wumbo
 {
@@ -145,6 +146,18 @@ static value_type get_return_type(const expression& p)
 */
 struct compiler : ext_types
 {
+    std::vector<bool> _required_functions;
+
+    const char* require(functions function)
+    {
+        size_t index = static_cast<std::underlying_type_t<functions>>(function);
+        if (index >= _required_functions.size())
+            _required_functions.resize(index + 1);
+        _required_functions[index] = true;
+        return funcs[index].name;
+    }
+
+
     struct local_var
     {
         std::string name;
