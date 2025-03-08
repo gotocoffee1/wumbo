@@ -36,4 +36,5 @@ struct func_sig
     build_func_t build;
 };
 
+const func_sig& get_sig(size_t i);
 } // namespace wumbo

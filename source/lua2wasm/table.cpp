@@ -19,23 +19,21 @@ expr_ref compiler::find_bucket(expr_ref table, expr_ref hash)
 
 expr_ref compiler::table_get(expr_ref table, expr_ref key)
 {
-    return make_call(require(functions::table_get),
+    return runtime_call(functions::table_get,
                      std::array{
                          table,
                          key,
-                     },
-                     anyref());
+                     });
 }
 
 expr_ref compiler::table_set(expr_ref table, expr_ref key, expr_ref value)
 {
-    return make_call(require(functions::table_set),
+    return runtime_call(functions::table_set,
                      std::array{
                          table,
                          key,
                          value,
-                     },
-                     BinaryenTypeNone());
+                     });
 }
 
 expr_ref compiler::operator()(const table_constructor& p)

@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "ast.hpp"
+#include "runtime.hpp"
 #include "util.hpp"
 #include "wasm_util.hpp"
-#include "runtime.hpp"
 
 namespace wumbo
 {
@@ -148,15 +148,23 @@ struct compiler : ext_types
 {
     std::vector<bool> _required_functions;
 
-    const char* require(functions function)
+    const func_sig& require(functions function)
     {
         size_t index = static_cast<std::underlying_type_t<functions>>(function);
         if (index >= _required_functions.size())
             _required_functions.resize(index + 1);
         _required_functions[index] = true;
-        return funcs[index].name;
+        return get_sig(index);
     }
 
+    template<size_t N>
+    auto runtime_call(functions function, std::array<expr_ref, N> params)
+    {
+        auto& sig = require(function);
+        return make_call(sig.name,
+                         params,
+                         sig.return_type);
+    }
 
     struct local_var
     {
@@ -744,10 +752,10 @@ struct compiler : ext_types
 
             exp[1] = local_set(j + offset,
                                is_upvalue ? BinaryenStructNew(
-                                   mod,
-                                   &get,
-                                   1,
-                                   BinaryenTypeGetHeapType(upvalue_type()))
+                                                mod,
+                                                &get,
+                                                1,
+                                                BinaryenTypeGetHeapType(upvalue_type()))
                                           : get);
         }
 

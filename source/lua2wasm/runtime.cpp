@@ -6,15 +6,21 @@
 
 namespace wumbo
 {
-func_sig funcs[] = {
+static func_sig funcs[] = {
     {"table_get", create_type(anyref(), anyref()), anyref(), &runtime::table_get},
     {"table_set", create_type(anyref(), anyref(), anyref()), BinaryenTypeNone()},
 
 };
+
+const func_sig& get_sig(size_t i)
+{
+    return funcs[i];
+}
+
 void runtime::build()
 {
     build_types();
-    for (size_t i = 0; i < _required_functions.size(); ++i)
+    for (size_t i = 0; i < std::size(funcs); ++i)
     {
         auto& f = funcs[i];
         if (import_functions)
