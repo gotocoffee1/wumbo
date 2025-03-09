@@ -8,6 +8,7 @@
 #include "ast.hpp"
 #include "runtime.hpp"
 #include "util.hpp"
+#include "wasm.hpp"
 #include "wasm_util.hpp"
 
 namespace wumbo
@@ -146,25 +147,13 @@ static value_type get_return_type(const expression& p)
 */
 struct compiler : ext_types
 {
-    std::vector<bool> _required_functions;
-
-    const func_sig& require(functions function)
+    compiler(BinaryenModuleRef mod, runtime& runtime)
+        : ext_types{mod}
+        , _runtime{runtime}
     {
-        size_t index = static_cast<std::underlying_type_t<functions>>(function);
-        if (index >= _required_functions.size())
-            _required_functions.resize(index + 1);
-        _required_functions[index] = true;
-        return get_sig(index);
     }
 
-    template<size_t N>
-    auto runtime_call(functions function, std::array<expr_ref, N> params)
-    {
-        auto& sig = require(function);
-        return make_call(sig.name,
-                         params,
-                         sig.return_type);
-    }
+    runtime& _runtime;
 
     struct local_var
     {
