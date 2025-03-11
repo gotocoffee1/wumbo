@@ -4,12 +4,13 @@
 #include "type.hpp"
 #include "wasm_util.hpp"
 
+#include <functional>
+
 namespace wumbo
 {
 static func_sig funcs[] = {
     {"table_get", create_type(anyref(), anyref()), anyref(), &runtime::table_get},
     {"table_set", create_type(anyref(), anyref(), anyref()), BinaryenTypeNone(), &runtime::table_set},
-
 };
 
 const func_sig& runtime::require(functions function)
@@ -241,47 +242,46 @@ build_return_t runtime::table_set()
     for (auto value : casts)
         compare(to_string(value), value);
 
-
     for (auto value : casts)
         init_table_type_set(to_string(value), value);
 
-    return {{}, make_block(switch_value(key, casts, [&](value_type type, expr_ref exp)
-                                        {
-                                            expr_ref args[] = {
-                                                table,
-                                                exp,
-                                                value,
-                                            };
+    return {std::vector<BinaryenType>{}, make_block(switch_value(key, casts, [&](value_type type, expr_ref exp)
+                                                                 {
+                                                                     expr_ref args[] = {
+                                                                         table,
+                                                                         exp,
+                                                                         value,
+                                                                     };
 
-                                            const char* func;
-                                            switch (type)
-                                            {
-                                            case value_type::integer:
-                                                func = "*table_set_integer";
-                                                break;
-                                            case value_type::number:
-                                                func = "*table_set_number";
-                                                break;
-                                            case value_type::string:
-                                                func = "*table_set_string";
-                                                break;
-                                            case value_type::nil:
-                                            case value_type::boolean:
-                                            case value_type::function:
-                                            case value_type::userdata:
-                                            case value_type::thread:
-                                            case value_type::table:
+                                                                     const char* func;
+                                                                     switch (type)
+                                                                     {
+                                                                     case value_type::integer:
+                                                                         func = "*table_set_integer";
+                                                                         break;
+                                                                     case value_type::number:
+                                                                         func = "*table_set_number";
+                                                                         break;
+                                                                     case value_type::string:
+                                                                         func = "*table_set_string";
+                                                                         break;
+                                                                     case value_type::nil:
+                                                                     case value_type::boolean:
+                                                                     case value_type::function:
+                                                                     case value_type::userdata:
+                                                                     case value_type::thread:
+                                                                     case value_type::table:
 
-                                            default:
-                                                return BinaryenUnreachable(mod);
-                                            }
+                                                                     default:
+                                                                         return BinaryenUnreachable(mod);
+                                                                     }
 
-                                            return BinaryenReturnCall(mod,
-                                                                      func,
-                                                                      std::data(args),
-                                                                      std::size(args),
-                                                                      BinaryenTypeNone());
-                                        }))};
+                                                                     return BinaryenReturnCall(mod,
+                                                                                               func,
+                                                                                               std::data(args),
+                                                                                               std::size(args),
+                                                                                               BinaryenTypeNone());
+                                                                 }))};
 }
 
 build_return_t runtime::table_get()
@@ -361,7 +361,7 @@ build_return_t runtime::table_get()
     for (auto value : casts)
         init_table_type_get(to_string(value), value);
 
-    return {{},
+    return {std::vector<BinaryenType>{},
 
             make_block(switch_value(key,
                                     casts,

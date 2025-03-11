@@ -3,6 +3,8 @@
 #include "binaryen-c.h"
 
 #include <array>
+#include <stdexcept>
+#include <variant>
 #include <vector>
 
 #include "util.hpp"
