@@ -11,11 +11,10 @@ wasm::mod compile(const block& chunk, uint32_t optimize)
     BinaryenModuleRef mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
     runtime r{mod};
     r.create_functions = function_action::all;
+    r.build_types();
     compiler c{mod, r};
-    c.build_types();
     c.convert(chunk); // remove
     r.build();
-    //c.convert();
     //BinaryenSetStart(mod, v);
     //BinaryenAddFunctionExport(mod, "convert", "start");
     //BinaryenModuleAutoDrop(mod);

@@ -54,6 +54,14 @@
       ]
     },
     {
+      "name": "x64-windows-msvc",
+      "inherits": [
+        "common",
+        "platform-x64-windows",
+        "flags-windows"
+      ]
+    },
+    {
       "name": "x64-linux-gcc",
       "inherits": [
         "common",

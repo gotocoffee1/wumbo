@@ -8,25 +8,29 @@
 
 namespace wumbo
 {
-static func_sig funcs[] = {
-    {"table_get", create_type(anyref(), anyref()), anyref(), &runtime::table_get},
-    {"table_set", create_type(anyref(), anyref(), anyref()), BinaryenTypeNone(), &runtime::table_set},
-};
 
+auto& get_funcs()
+{
+    static const func_sig funcs[] = {
+        {"table_get", create_type(anyref(), anyref()), anyref(), &runtime::table_get},
+        {"table_set", create_type(anyref(), anyref(), anyref()), BinaryenTypeNone(), &runtime::table_set},
+    };
+    return funcs;
+}
 const func_sig& runtime::require(functions function)
 {
     size_t index = static_cast<std::underlying_type_t<functions>>(function);
     if (index >= _required_functions.size())
         _required_functions.resize(index + 1);
     _required_functions[index] = true;
-    return funcs[index];
+    return get_funcs()[index];
 }
 
 void runtime::build()
 {
-    for (size_t i = 0; i < std::size(funcs); ++i)
+    for (size_t i = 0; i < std::size(get_funcs()); ++i)
     {
-        auto& f = funcs[i];
+        auto& f = get_funcs()[i];
         bool use;
         if (i >= _required_functions.size())
             use = false;
@@ -239,8 +243,8 @@ build_return_t runtime::table_set()
         value_type::string,
     };
 
-    for (auto value : casts)
-        compare(to_string(value), value);
+    //for (auto value : casts)
+    //    compare(to_string(value), value);
 
     for (auto value : casts)
         init_table_type_set(to_string(value), value);
@@ -340,7 +344,6 @@ build_return_t runtime::table_get()
 
     auto table = local_get(0, anyref());
     auto key   = local_get(1, anyref());
-    auto value = local_get(2, anyref());
     table      = BinaryenRefCast(mod, table, type<value_type::table>());
 
     //auto hash = calc_hash(key);

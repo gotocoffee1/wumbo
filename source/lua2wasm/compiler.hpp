@@ -22,135 +22,15 @@ enum class var_type
     upvalue,
     global,
 };
-/*
-static value_type get_return_type(const expression& p)
-{
-    return std::visit(overload{
-                          [](const nil&)
-                          {
-                              return value_type::nil;
-                          },
-                          [](const boolean& p)
-                          {
-                              return value_type::boolean;
-                          },
-                          [](const int_type& p)
-                          {
-                              return value_type::integer;
-                          },
-                          [](const float_type& p)
-                          {
-                              return value_type::number;
-                          },
-                          [](const literal& p)
-                          {
-                              return value_type::string;
-                          },
-                          [](const ellipsis& p)
-                          {
-                              return value_type{-1};
-                          },
-                          [](const function_body& p)
-                          {
-                              return value_type::function;
-                          },
-                          [](const table_constructor& p)
-                          {
-                              return value_type::table;
-                          },
-                          [](const box<bin_operation>& p)
-                          {
-                              auto lhs = get_return_type(p->lhs);
-                              auto rhs = get_return_type(p->rhs);
-                              if (lhs == value_type::integer && rhs == value_type::integer)
-                              {
-                                  switch (p->op)
-                                  {
-                                  case bin_operator::addition:
-                                      break;
-                                  case bin_operator::subtraction:
-                                      break;
-                                  case bin_operator::multiplication:
-                                      break;
-                                  case bin_operator::division:
-                                      break;
-                                  default:
-                                      break;
-                                  }
-                                  return value_type::integer;
-                              }
 
-                              if (lhs == value_type::number && rhs == value_type::number)
-                              {
-                                  switch (p->op)
-                                  {
-                                  case bin_operator::addition:
-                                      break;
-                                  case bin_operator::subtraction:
-                                      break;
-                                  case bin_operator::multiplication:
-                                      break;
-                                  case bin_operator::division:
-                                      break;
-                                  default:
-                                      break;
-                                  }
-
-                                  return value_type::number;
-                              }
-                              else
-                              {
-                                  if (lhs == value_type::integer && rhs == value_type::number)
-                                  {
-                                      return value_type::number;
-                                  }
-                                  if (lhs == value_type::number && rhs == value_type::integer)
-                                  {
-                                      return value_type::number;
-                                  }
-                              }
-
-                              return value_type::dynamic;
-                          },
-                          [](const box<un_operation>& p)
-                          {
-                              auto rhs = get_return_type(p->rhs);
-
-                              switch (p->op)
-                              {
-                              case un_operator::minus:
-                                  if (rhs == value_type::number)
-                                      return value_type::number;
-                                  else if (rhs == value_type::integer)
-                                      return value_type::integer;
-                                  break;
-                              case un_operator::logic_not:
-                                  break;
-                              case un_operator::len:
-                                  return value_type::integer;
-                              case un_operator::binary_not:
-                                  break;
-                              default:
-                                  break;
-                              }
-                              return value_type::dynamic;
-                          },
-
-                          [](const auto&)
-                          {
-                              return value_type::dynamic;
-                          },
-                      } // namespace lua2wasm
-                      ,
-                      p.inner);
-}
-*/
 struct compiler : ext_types
 {
     compiler(BinaryenModuleRef mod, runtime& runtime)
         : ext_types{mod}
         , _runtime{runtime}
     {
+        if (_runtime.mod == mod)
+            types = _runtime.types;
     }
 
     runtime& _runtime;

@@ -4,6 +4,7 @@
 
 #include <array>
 #include <stdexcept>
+#include <string>
 #include <variant>
 #include <vector>
 
@@ -163,7 +164,7 @@ struct ext_types : utils
 
     static constexpr size_t type_count = 12;
 
-    BinaryenType types[type_count];
+    std::array<BinaryenType, type_count> types;
 
     const char* error_tag = "error";
 
