@@ -29,7 +29,7 @@ extern "C"
         {
             ast::block chunk;
             parse_string(std::string_view{str, size}, chunk);
-            res->mod = wumbo::compile(chunk, optimize);
+            res->mod = wumbo::compile(chunk, optimize, true);
         }
         catch (const std::exception& e)
         {
