@@ -22,14 +22,30 @@ struct result
 extern "C"
 {
     using namespace wumbo;
-    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size, uint32_t optimize)
+
+    EMSCRIPTEN_KEEPALIVE result* generate_runtime(uint32_t optimize)
+    {
+        auto res = new result{};
+        try
+        {
+            res->mod = wumbo::make_runtime(optimize);
+        }
+        catch (const std::exception& e)
+        {
+            res->error = e.what();
+        }
+
+        return res;
+    }
+
+    EMSCRIPTEN_KEEPALIVE result* load_lua(const char* str, size_t size, uint32_t optimize, bool standalone)
     {
         auto res = new result{};
         try
         {
             ast::block chunk;
             parse_string(std::string_view{str, size}, chunk);
-            res->mod = wumbo::compile(chunk, optimize, true);
+            res->mod = wumbo::compile(chunk, optimize, standalone);
         }
         catch (const std::exception& e)
         {
@@ -49,9 +65,9 @@ extern "C"
         if (!ptr->data)
         {
             auto [data, size, source_map] = to_bin(ptr->mod);
-            ptr->data = std::move(data);
-            ptr->size = size;
-            ptr->source_map = std::move(source_map);
+            ptr->data                     = std::move(data);
+            ptr->size                     = size;
+            ptr->source_map               = std::move(source_map);
         }
         return ptr->size;
     }
@@ -61,9 +77,9 @@ extern "C"
         if (!ptr->data)
         {
             auto [data, size, source_map] = to_bin(ptr->mod);
-            ptr->data = std::move(data);
-            ptr->size = size;
-            ptr->source_map = std::move(source_map);
+            ptr->data                     = std::move(data);
+            ptr->size                     = size;
+            ptr->source_map               = std::move(source_map);
         }
         return ptr->data.get();
     }
@@ -73,9 +89,9 @@ extern "C"
         if (!ptr->source_map)
         {
             auto [data, size, source_map] = to_bin(ptr->mod);
-            ptr->data = std::move(data);
-            ptr->size = size;
-            ptr->source_map = std::move(source_map);
+            ptr->data                     = std::move(data);
+            ptr->size                     = size;
+            ptr->source_map               = std::move(source_map);
         }
         return ptr->source_map.get();
     }
