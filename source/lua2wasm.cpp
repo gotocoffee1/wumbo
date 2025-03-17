@@ -6,6 +6,18 @@
 namespace wumbo
 {
 
+void opt(wasm::mod& result)
+{
+    BinaryenModuleRef mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
+    auto feature = BinaryenModuleGetFeatures(mod);
+    auto res     = BinaryenModuleAllocateAndWrite(mod, nullptr);
+    result.impl.reset(BinaryenModuleReadWithFeatures((char*)res.binary, res.binaryBytes, feature));
+    mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
+    free(res.binary);
+    free(res.sourceMap);
+    BinaryenModuleOptimize(mod);
+}
+
 wasm::mod make_runtime(uint32_t optimize)
 {
     wasm::mod result;
@@ -20,7 +32,7 @@ wasm::mod make_runtime(uint32_t optimize)
 
     BinaryenModuleValidate(mod);
     if (optimize)
-        BinaryenModuleOptimize(mod);
+        opt(result);
 
     return result;
 }
@@ -56,18 +68,7 @@ wasm::mod compile(const block& chunk, uint32_t optimize, bool stand_alone)
 
     if (optimize)
     {
-        auto opt = [](wasm::mod& result, BinaryenModuleRef mod)
-        {
-            auto feature = BinaryenModuleGetFeatures(mod);
-            auto res     = BinaryenModuleAllocateAndWrite(mod, nullptr);
-            result.impl.reset(BinaryenModuleReadWithFeatures((char*)res.binary, res.binaryBytes, feature));
-            mod = reinterpret_cast<BinaryenModuleRef>(result.impl.get());
-            free(res.binary);
-            free(res.sourceMap);
-            BinaryenModuleOptimize(mod);
-        };
-
-        opt(result, mod);
+        opt(result);
     }
 
     return result;
