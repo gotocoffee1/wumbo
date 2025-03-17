@@ -34,15 +34,6 @@ editorWat.setReadOnly(true);
 initEditor(editorWat);
 
 import { newInstance } from "./wumbo.mjs";
-const load = await newInstance({
-  print: {
-    string: (arg) => {
-      arg = new TextDecoder().decode(arg);
-      console.log(arg);
-      appendConsole(arg);
-    },
-  },
-});
 
 const optimize = document.getElementById("optimize");
 const watFormat = document.getElementById("watFormat");
@@ -51,11 +42,21 @@ run.onclick = async () => {
   editorConsole.setValue("");
   editorWat.setValue("");
   try {
-    const [f, wat] = await load(
-      editorLua.getValue(),
-      optimize.checked,
-      watFormat.checked,
-    );
+    const load = await newInstance({
+      override: {
+        print: {
+          string: (arg) => {
+            arg = new TextDecoder().decode(arg);
+            console.log(arg);
+            appendConsole(arg);
+          },
+        },
+      },
+      optimize: optimize.checked,
+      format: watFormat.checked,
+      standalone: false,
+    });
+    const [f, wat] = await load(editorLua.getValue());
     editorWat.setValue(wat);
     f();
   } catch (e) {
