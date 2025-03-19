@@ -409,49 +409,7 @@ struct compiler : ext_types
 
         return result;
     }
-    auto to_bool()
-    {
-        auto casts = std::array{
-            value_type::boolean,
-        };
 
-        BinaryenAddFunction(mod,
-                            "*to_bool",
-                            anyref(),
-                            bool_type(),
-                            nullptr,
-                            0,
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
-                                                    {
-                                                        switch (type)
-                                                        {
-                                                        case value_type::nil:
-                                                            return make_return(const_i32(0));
-                                                        case value_type::boolean:
-                                                            return make_return(BinaryenI31Get(mod, exp, false));
-                                                        default:
-                                                            return make_return(const_i32(1));
-                                                        }
-                                                    })));
-        BinaryenAddFunction(mod,
-                            "*to_bool_invert",
-                            anyref(),
-                            bool_type(),
-                            nullptr,
-                            0,
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
-                                                    {
-                                                        switch (type)
-                                                        {
-                                                        case value_type::nil:
-                                                            return make_return(const_i32(1));
-                                                        case value_type::boolean:
-                                                            return make_return(BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenI31Get(mod, exp, false)));
-                                                        default:
-                                                            return make_return(const_i32(0));
-                                                        }
-                                                    })));
-    }
     expr_ref_list operator()(const do_statement& p)
     {
         return (*this)(p.inner);
@@ -464,7 +422,7 @@ struct compiler : ext_types
         for (auto& [cond_exp, body] : p.cond_block)
         {
             auto cond = (*this)(cond_exp);
-            auto next = make_if(make_call("*to_bool", cond, bool_type()), make_block((*this)(body)));
+            auto next = make_if(_runtime.call(functions::to_bool, cond), make_block((*this)(body)));
             if (last)
                 BinaryenIfSetIfFalse(last, next);
             else
@@ -763,7 +721,6 @@ struct compiler : ext_types
 
     auto convert(const block& chunk)
     {
-        to_bool();
         make_un_operation();
         make_bin_operation();
 

@@ -4,33 +4,34 @@
 #include "type.hpp"
 #include "wasm_util.hpp"
 
+#include <array>
 #include <functional>
 
 namespace wumbo
 {
 
-auto& get_funcs()
-{
-    static const func_sig funcs[] = {
-        {"table_get", create_type(anyref(), anyref()), anyref(), &runtime::table_get},
-        {"table_set", create_type(anyref(), anyref(), anyref()), BinaryenTypeNone(), &runtime::table_set},
-    };
-    return funcs;
-}
 const func_sig& runtime::require(functions function)
 {
     size_t index = static_cast<std::underlying_type_t<functions>>(function);
     if (index >= _required_functions.size())
         _required_functions.resize(index + 1);
     _required_functions[index] = true;
-    return get_funcs()[index];
+    return _funcs[index];
+}
+
+void runtime::build_types()
+{
+    ext_types::build_types();
+#define FUNC_LIST(name, params, ret) {#name, params, ret, &runtime::name},
+    _funcs = decltype(_funcs){{RUNTIME_FUNCTIONS(FUNC_LIST)}};
+#undef FUNC_LIST
 }
 
 void runtime::build()
 {
-    for (size_t i = 0; i < std::size(get_funcs()); ++i)
+    for (size_t i = 0; i < std::size(_funcs); ++i)
     {
-        auto& f = get_funcs()[i];
+        auto& f = _funcs[i];
         bool use;
         if (i >= _required_functions.size())
             use = false;
@@ -403,6 +404,48 @@ build_return_t runtime::table_get()
                                                                   std::data(args),
                                                                   std::size(args),
                                                                   anyref());
+                                    }))};
+}
+
+build_return_t runtime::to_bool()
+{
+    auto casts = std::array{
+        value_type::boolean,
+    };
+
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        switch (type)
+                                        {
+                                        case value_type::nil:
+                                            return make_return(const_i32(0));
+                                        case value_type::boolean:
+                                            return make_return(BinaryenI31Get(mod, exp, false));
+                                        default:
+                                            return make_return(const_i32(1));
+                                        }
+                                    }))};
+}
+
+build_return_t runtime::to_bool_not()
+{
+    auto casts = std::array{
+        value_type::boolean,
+    };
+
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        switch (type)
+                                        {
+                                        case value_type::nil:
+                                            return make_return(const_i32(1));
+                                        case value_type::boolean:
+                                            return make_return(BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenI31Get(mod, exp, false)));
+                                        default:
+                                            return make_return(const_i32(0));
+                                        }
                                     }))};
 }
 } // namespace wumbo

@@ -36,10 +36,10 @@ expr_ref_list compiler::operator()(const while_statement& p)
     auto begin = loop_begin(this);
     auto end   = loop_end(this);
 
-    body.push_back(BinaryenBreak(mod, begin.c_str(), make_call("*to_bool", cond, bool_type()), nullptr));
+    body.push_back(BinaryenBreak(mod, begin.c_str(), _runtime.call(functions::to_bool, cond), nullptr));
 
     return {make_block(std::array{
-                           BinaryenBreak(mod, end.c_str(), make_call("*to_bool_invert", cond, bool_type()), nullptr),
+                           BinaryenBreak(mod, end.c_str(), _runtime.call(functions::to_bool_not, cond), nullptr),
                            BinaryenLoop(mod, begin.c_str(), make_block(body)),
                        },
                        end.c_str())};
@@ -54,7 +54,7 @@ expr_ref_list compiler::operator()(const repeat_statement& p)
     auto end   = loop_end(this);
 
     auto body = (*this)(p.inner);
-    body.push_back(BinaryenBreak(mod, begin.c_str(), make_call("*to_bool_invert", cond, bool_type()), nullptr));
+    body.push_back(BinaryenBreak(mod, begin.c_str(), _runtime.call(functions::to_bool_not, cond), nullptr));
     return {BinaryenLoop(mod, begin.c_str(), make_block(body, end.c_str()))};
 }
 

@@ -245,13 +245,13 @@ expr_ref compiler::operator()(const bin_operation& p)
     case bin_operator::logic_and:
     {
         auto left = help_var_scope{_func_stack, anyref()};
-        return make_if(make_call("*to_bool", local_tee(left, lhs, anyref()), bool_type()), rhs, local_get(left, anyref()));
+        return make_if(_runtime.call(functions::to_bool, local_tee(left, lhs, anyref())), rhs, local_get(left, anyref()));
     }
 
     case bin_operator::logic_or:
     {
         auto left = help_var_scope{_func_stack, anyref()};
-        return make_if(make_call("*to_bool", local_tee(left, lhs, anyref()), bool_type()), local_get(left, anyref()), rhs);
+        return make_if(_runtime.call(functions::to_bool, local_tee(left, lhs, anyref())), local_get(left, anyref()), rhs);
     }
     };
 
@@ -319,7 +319,7 @@ void compiler::make_un_operation()
                             anyref(),
                             std::data(vars),
                             std::size(vars),
-                            BinaryenRefI31(mod, make_call("*to_bool_invert", local_get(0, anyref()), bool_type())));
+                            BinaryenRefI31(mod, _runtime.call(functions::to_bool_not, local_get(0, anyref()))));
     }
     {
         auto casts = std::array{
