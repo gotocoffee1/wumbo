@@ -157,7 +157,16 @@ struct utils
 
 struct ext_types : utils
 {
-    void import_func(const char* name, BinaryenType params, BinaryenType results, const char* module_name = "runtime")
+    size_t data_name = 0;
+
+    expr_ref add_string(const std::string& str)
+    {
+        auto name = std::to_string(data_name++);
+        BinaryenAddDataSegment(mod, name.c_str(), "", true, 0, str.data(), str.size());
+        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_type::string>()), name.c_str(), const_i32(0), const_i32(str.size()));
+    }
+
+    void import_func(const char* name, BinaryenType params, BinaryenType results, const char* module_name)
     {
         BinaryenAddFunctionImport(mod, name, module_name, name, params, results);
     }

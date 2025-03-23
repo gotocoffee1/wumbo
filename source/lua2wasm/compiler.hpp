@@ -298,7 +298,6 @@ struct compiler : ext_types
     function_stack _func_stack;
 
     size_t function_name = 0;
-    size_t data_name     = 0;
     size_t label_name    = 0;
 
     expr_ref get_upvalue(size_t index)
@@ -469,13 +468,6 @@ struct compiler : ext_types
     auto operator()(const float_type& p)
     {
         return new_number(const_number(p));
-    }
-
-    expr_ref add_string(const std::string& str)
-    {
-        auto name = std::to_string(data_name++);
-        BinaryenAddDataSegment(mod, name.c_str(), "", true, 0, str.data(), str.size());
-        return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_type::string>()), name.c_str(), const_i32(0), const_i32(str.size()));
     }
 
     expr_ref operator()(const literal& p)
@@ -696,8 +688,6 @@ struct compiler : ext_types
 
     expr_ref operator()(const bin_operation& p);
 
-    void make_un_operation();
-
     expr_ref operator()(const un_operation& p);
 
     auto operator()(const block& p) -> expr_ref_list
@@ -721,7 +711,6 @@ struct compiler : ext_types
 
     auto convert(const block& chunk)
     {
-        make_un_operation();
         make_bin_operation();
 
         function_frame frame{_func_stack, 0, std::nullopt};

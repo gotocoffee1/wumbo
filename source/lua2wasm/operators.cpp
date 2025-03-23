@@ -1,4 +1,6 @@
+#include "ast.hpp"
 #include "compiler.hpp"
+#include "lua2wasm/runtime.hpp"
 
 #include <functional>
 
@@ -253,6 +255,8 @@ expr_ref compiler::operator()(const bin_operation& p)
         auto left = help_var_scope{_func_stack, anyref()};
         return make_if(_runtime.call(functions::to_bool, local_tee(left, lhs, anyref())), local_get(left, anyref()), rhs);
     }
+    default:
+        break;
     };
 
     const char* func = [&]()
@@ -308,107 +312,6 @@ expr_ref compiler::operator()(const bin_operation& p)
     return make_call(func, std::array{lhs, rhs}, anyref());
 }
 
-void compiler::make_un_operation()
-{
-    auto vars = std::array<BinaryenType, 0>{};
-
-    {
-        BinaryenAddFunction(mod,
-                            "*logic_not",
-                            anyref(),
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            BinaryenRefI31(mod, _runtime.call(functions::to_bool_not, local_get(0, anyref()))));
-    }
-    {
-        auto casts = std::array{
-            value_type::integer,
-            value_type::number,
-        };
-
-        BinaryenAddFunction(mod,
-                            "*binary_not",
-                            anyref(),
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
-                                                    {
-                                                        switch (type)
-                                                        {
-                                                        case value_type::integer:
-                                                            exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
-                                                            return make_return(new_integer(xor_int(const_integer(-1), exp)));
-                                                        case value_type::number:
-                                                            // TODO
-                                                            return make_return(exp);
-                                                        default:
-                                                            return throw_error(add_string("unexpected type"));
-                                                        }
-                                                    })));
-    }
-    {
-        auto casts = std::array{
-            value_type::integer,
-            value_type::number,
-        };
-        BinaryenAddFunction(mod,
-                            "*minus",
-                            anyref(),
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
-                                                    {
-                                                        switch (type)
-                                                        {
-                                                        case value_type::integer:
-                                                            exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
-                                                            return make_return(new_integer(mul_int(const_integer(-1), exp)));
-                                                        case value_type::number:
-                                                            exp = BinaryenStructGet(mod, 0, exp, number_type(), false);
-                                                            return make_return(new_number(neg_num(exp)));
-                                                        default:
-                                                            return throw_error(add_string("unexpected type"));
-                                                        }
-                                                    })));
-    }
-
-    {
-        auto casts = std::array{
-            value_type::string,
-            value_type::table,
-            //value_type::userdata,
-        };
-
-        BinaryenAddFunction(mod,
-                            "*len",
-                            anyref(),
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
-                                                    {
-                                                        switch (type)
-                                                        {
-                                                        case value_type::string:
-                                                            return make_return(new_integer(size_to_integer(array_len(exp))));
-                                                        case value_type::table:
-                                                        case value_type::userdata:
-                                                        {
-                                                            // TODO
-
-                                                            return drop(exp);
-                                                        }
-                                                        default:
-
-                                                            return throw_error(add_string("unexpected type"));
-                                                        }
-                                                    })));
-    }
-}
-
 expr_ref compiler::operator()(const un_operation& p)
 {
     auto rhs = (*this)(p.rhs);
@@ -418,19 +321,24 @@ expr_ref compiler::operator()(const un_operation& p)
         auto local = help_var_scope{_func_stack, ref_array_type()};
         rhs        = at_or_null(local, 0, rhs);
     }
-    switch (p.op)
+    functions f = [this](un_operator op)
     {
-    case un_operator::minus:
-        return make_call("*minus", rhs, anyref());
-    case un_operator::logic_not:
-        return make_call("*logic_not", rhs, anyref());
-    case un_operator::len:
-        return make_call("*len", rhs, anyref());
-    case un_operator::binary_not:
-        return make_call("*binary_not", rhs, anyref());
-    default:
-        semantic_error("");
-        break;
-    }
+        switch (op)
+        {
+        case un_operator::minus:
+            return functions::minus;
+        case un_operator::logic_not:
+            return functions::logic_not;
+        case un_operator::len:
+            return functions::len;
+        case un_operator::binary_not:
+            return functions::binary_not;
+        default:
+            semantic_error("");
+            break;
+        }
+    }(p.op);
+
+    return _runtime.call(f, rhs);
 }
 } // namespace wumbo

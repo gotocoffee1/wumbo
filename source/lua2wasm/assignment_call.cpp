@@ -1,50 +1,14 @@
 #include "compiler.hpp"
+#include "lua2wasm/runtime.hpp"
 
 namespace wumbo
 {
 
 expr_ref compiler::call(expr_ref func, expr_ref args)
 {
-    if (!BinaryenGetFunction(mod, "*invoke"))
-    {
-        auto casts = std::array{
-            value_type::function,
-        };
-        auto params = std::array{anyref(), ref_array_type()};
-        auto vars   = std::array{type<value_type::function>()};
-        BinaryenAddFunction(mod,
-                            "*invoke",
-                            BinaryenTypeCreate(std::data(params), std::size(params)),
-                            ref_array_type(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type exp_type, expr_ref exp)
-                                                    {
-                                                        switch (exp_type)
-                                                        {
-                                                        case value_type::function:
-                                                        {
-                                                            auto t     = type<value_type::function>();
-                                                            auto local = 2;
-
-                                                            auto func_ref = BinaryenStructGet(mod, 0, local_get(local, t), BinaryenTypeFuncref(), false);
-                                                            auto upvalues = BinaryenStructGet(mod, 1, local_tee(local, exp, t), ref_array_type(), false);
-
-                                                            expr_ref real_args[2];
-
-                                                            real_args[upvalue_index] = upvalues;
-                                                            real_args[args_index]    = local_get(1, ref_array_type());
-                                                            return BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), true);
-                                                        }
-
-                                                        default:
-                                                            return throw_error(add_string("not a function"));
-                                                        }
-                                                    })));
-    }
     auto bundle_args = std::array{func, args};
 
-    return make_call("*invoke", bundle_args, ref_array_type());
+    return _runtime.call(functions::invoke, bundle_args);
 }
 
 expr_ref compiler::_funchead(const funchead& p)

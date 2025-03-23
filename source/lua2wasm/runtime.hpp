@@ -8,7 +8,12 @@
     DO(table_get, create_type(anyref(), anyref()), anyref())                     \
     DO(table_set, create_type(anyref(), anyref(), anyref()), BinaryenTypeNone()) \
     DO(to_bool, anyref(), bool_type())                                           \
-    DO(to_bool_not, anyref(), bool_type())
+    DO(to_bool_not, anyref(), bool_type())                                       \
+    DO(logic_not, anyref(), anyref())                                       \
+    DO(binary_not, anyref(), anyref())                                       \
+    DO(minus, anyref(), anyref())                                       \
+    DO(len, anyref(), anyref())                                       \
+    DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 
 namespace wumbo
 {

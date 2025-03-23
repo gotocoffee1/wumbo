@@ -55,7 +55,7 @@ void runtime::build()
         };
         if (test(import_functions))
         {
-            import_func(f.name, f.params_type, f.return_type);
+            import_func(f.name, f.params_type, f.return_type, "runtime");
         }
         if (test(export_functions))
         {
@@ -445,6 +445,118 @@ build_return_t runtime::to_bool_not()
                                             return make_return(BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenI31Get(mod, exp, false)));
                                         default:
                                             return make_return(const_i32(0));
+                                        }
+                                    }))};
+}
+build_return_t runtime::invoke()
+{
+    auto casts = std::array{
+        value_type::function,
+    };
+    return {std::vector<BinaryenType>{type<value_type::function>()},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type exp_type, expr_ref exp)
+                                    {
+                                        switch (exp_type)
+                                        {
+                                        case value_type::function:
+                                        {
+                                            auto t     = type<value_type::function>();
+                                            auto local = 2;
+
+                                            auto func_ref = BinaryenStructGet(mod, 0, local_get(local, t), BinaryenTypeFuncref(), false);
+                                            auto upvalues = BinaryenStructGet(mod, 1, local_tee(local, exp, t), ref_array_type(), false);
+
+                                            expr_ref real_args[2];
+
+                                            real_args[upvalue_index] = upvalues;
+                                            real_args[args_index]    = local_get(1, ref_array_type());
+                                            return BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), true);
+                                        }
+
+                                        default:
+                                            return throw_error(add_string("not a function"));
+                                        }
+                                    }))};
+}
+
+build_return_t runtime::logic_not()
+{
+    return {std::vector<BinaryenType>{},
+            BinaryenRefI31(mod, call(functions::to_bool_not, local_get(0, anyref())))};
+}
+
+build_return_t runtime::binary_not()
+{
+    auto casts = std::array{
+        value_type::integer,
+        value_type::number,
+    };
+
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        switch (type)
+                                        {
+                                        case value_type::integer:
+                                            exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
+                                            return make_return(new_integer(xor_int(const_integer(-1), exp)));
+                                        case value_type::number:
+                                            // TODO
+                                            return make_return(exp);
+                                        default:
+                                            return throw_error(add_string("unexpected type"));
+                                        }
+                                    }))};
+}
+
+build_return_t runtime::minus()
+{
+    auto casts = std::array{
+        value_type::integer,
+        value_type::number,
+    };
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        switch (type)
+                                        {
+                                        case value_type::integer:
+                                            exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
+                                            return make_return(new_integer(mul_int(const_integer(-1), exp)));
+                                        case value_type::number:
+                                            exp = BinaryenStructGet(mod, 0, exp, number_type(), false);
+                                            return make_return(new_number(neg_num(exp)));
+                                        default:
+                                            return throw_error(add_string("unexpected type"));
+                                        }
+                                    }))};
+}
+
+build_return_t runtime::len()
+{
+    auto casts = std::array{
+        value_type::string,
+        value_type::table,
+        //value_type::userdata,
+    };
+
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        switch (type)
+                                        {
+                                        case value_type::string:
+                                            return make_return(new_integer(size_to_integer(array_len(exp))));
+                                        case value_type::table:
+                                        case value_type::userdata:
+                                        {
+                                            // TODO
+
+                                            return drop(exp);
+                                        }
+                                        default:
+
+                                            return throw_error(add_string("unexpected type"));
                                         }
                                     }))};
 }
