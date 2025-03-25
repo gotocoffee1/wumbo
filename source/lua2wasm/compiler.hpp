@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "ast.hpp"
-#include "runtime.hpp"
+#include "runtime/runtime.hpp"
 #include "util.hpp"
 #include "wasm.hpp"
 #include "wasm_util.hpp"
@@ -684,8 +684,6 @@ struct compiler : ext_types
     expr_ref_list open_basic_lib();
     expr_ref_list setup_env();
 
-    void make_bin_operation();
-
     expr_ref operator()(const bin_operation& p);
 
     expr_ref operator()(const un_operation& p);
@@ -711,8 +709,6 @@ struct compiler : ext_types
 
     auto convert(const block& chunk)
     {
-        make_bin_operation();
-
         function_frame frame{_func_stack, 0, std::nullopt};
 
         auto env = setup_env();

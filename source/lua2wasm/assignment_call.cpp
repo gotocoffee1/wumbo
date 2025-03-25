@@ -1,5 +1,4 @@
 #include "compiler.hpp"
-#include "lua2wasm/runtime.hpp"
 
 namespace wumbo
 {

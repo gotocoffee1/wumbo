@@ -9,10 +9,28 @@
     DO(table_set, create_type(anyref(), anyref(), anyref()), BinaryenTypeNone()) \
     DO(to_bool, anyref(), bool_type())                                           \
     DO(to_bool_not, anyref(), bool_type())                                       \
-    DO(logic_not, anyref(), anyref())                                       \
-    DO(binary_not, anyref(), anyref())                                       \
-    DO(minus, anyref(), anyref())                                       \
-    DO(len, anyref(), anyref())                                       \
+    DO(logic_not, anyref(), anyref())                                            \
+    DO(binary_not, anyref(), anyref())                                           \
+    DO(minus, anyref(), anyref())                                                \
+    DO(len, anyref(), anyref())                                                  \
+    DO(addition, create_type(anyref(), anyref()), anyref())                      \
+    DO(subtraction, create_type(anyref(), anyref()), anyref())                   \
+    DO(multiplication, create_type(anyref(), anyref()), anyref())                \
+    DO(division, create_type(anyref(), anyref()), anyref())                      \
+    DO(division_floor, create_type(anyref(), anyref()), anyref())                \
+    DO(exponentiation, create_type(anyref(), anyref()), anyref())                \
+    DO(modulo, create_type(anyref(), anyref()), anyref())                        \
+    DO(binary_or, create_type(anyref(), anyref()), anyref())                     \
+    DO(binary_and, create_type(anyref(), anyref()), anyref())                    \
+    DO(binary_xor, create_type(anyref(), anyref()), anyref())                    \
+    DO(binary_right_shift, create_type(anyref(), anyref()), anyref())            \
+    DO(binary_left_shift, create_type(anyref(), anyref()), anyref())             \
+    DO(equality, create_type(anyref(), anyref()), anyref())                      \
+    DO(inequality, create_type(anyref(), anyref()), anyref())                    \
+    DO(less_than, create_type(anyref(), anyref()), anyref())                     \
+    DO(greater_than, create_type(anyref(), anyref()), anyref())                  \
+    DO(less_or_equal, create_type(anyref(), anyref()), anyref())                 \
+    DO(greater_or_equal, create_type(anyref(), anyref()), anyref())              \
     DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 
 namespace wumbo
@@ -56,6 +74,8 @@ struct runtime : ext_types
     void build_types();
     void build();
 
+    struct op;
+
 #define DECL_FUNCS(name, ...) build_return_t name();
     RUNTIME_FUNCTIONS(DECL_FUNCS)
 #undef DECL_FUNCS
@@ -72,8 +92,7 @@ struct runtime : ext_types
                          sig.return_type);
     }
 
-    template<size_t N>
-    auto call(functions function, std::array<expr_ref, N> params)
+    auto call(functions function, nonstd::span<const expr_ref> params)
     {
         auto& sig = require(function);
         return make_call(sig.name,

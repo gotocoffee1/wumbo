@@ -18,7 +18,8 @@ add_library(wumbo
   "source/lua2wasm.cpp"
   "source/wasm.cpp"
   "source/lua2wasm/locals.cpp"
-  "source/lua2wasm/runtime.cpp"
+  "source/lua2wasm/runtime/runtime.cpp"
+  "source/lua2wasm/runtime/operator.cpp"
   "source/lua2wasm/assignment_call.cpp"
   "source/lua2wasm/expression.cpp"
   "source/lua2wasm/table.cpp"
@@ -30,6 +31,7 @@ add_library(wumbo::wumbo ALIAS wumbo)
 
 find_package(pegtl CONFIG REQUIRED)
 find_package(CLI11 CONFIG REQUIRED)
+find_package(span-lite CONFIG REQUIRED)
 
 set(temp ${CMAKE_CXX_FLAGS})
 set(temp2 ${CMAKE_C_FLAGS})
@@ -65,6 +67,7 @@ target_compile_features(wumbo PUBLIC cxx_std_17)
 
 target_link_libraries(wumbo
   PRIVATE
+  nonstd::span-lite
   taocpp::pegtl
   binaryen)
 

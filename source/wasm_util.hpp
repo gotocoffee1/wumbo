@@ -8,6 +8,7 @@
 #include <variant>
 #include <vector>
 
+#include "nonstd/span.hpp"
 #include "util.hpp"
 
 namespace wumbo
@@ -81,12 +82,12 @@ struct utils
 
     expr_ref local_get(size_t index, BinaryenType type)
     {
-        return BinaryenLocalGet(mod, index, type);
+        return BinaryenLocalGet(mod, static_cast<BinaryenIndex>(index), type);
     }
 
     expr_ref local_set(size_t index, expr_ref value)
     {
-        return BinaryenLocalSet(mod, index, value);
+        return BinaryenLocalSet(mod, static_cast<BinaryenIndex>(index), value);
     }
 
     expr_ref local_tee(size_t index, expr_ref value, BinaryenType type)
@@ -104,24 +105,16 @@ struct utils
         return BinaryenArrayGet(mod, array, index, type, is_signed);
     }
 
-    template<size_t N>
-    expr_ref make_block(std::array<expr_ref, N> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
-    {
-        static_assert(N > 1);
-        return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
-    }
-
-    expr_ref make_block(expr_ref_list list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
+    expr_ref make_block(nonstd::span<const expr_ref> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
         if (list.size() == 1 && name == nullptr)
             return list[0];
-        return BinaryenBlock(mod, name, std::data(list), std::size(list), btype);
+        return BinaryenBlock(mod, name, const_cast<expr_ref*>(list.data()), list.size(), btype);
     }
 
-    template<size_t N>
-    expr_ref make_call(const char* target, std::array<expr_ref, N> args, BinaryenType btype)
+    expr_ref make_call(const char* target, nonstd::span<const expr_ref> args, BinaryenType btype)
     {
-        return BinaryenCall(mod, target, std::data(args), std::size(args), btype);
+        return BinaryenCall(mod, target, const_cast<expr_ref*>(args.data()), args.size(), btype);
     }
 
     expr_ref make_call(const char* target, expr_ref arg, BinaryenType btype)
@@ -378,8 +371,8 @@ struct ext_types : utils
         }
     }
 
-    template<typename F, size_t S>
-    auto switch_value(expr_ref exp, const std::array<value_type, S>& casts, F&& code)
+    template<typename F>
+    auto switch_value(expr_ref exp, nonstd::span<const value_type> casts, F&& code)
     {
         auto n       = "nil" + std::to_string(label_counter++);
         auto counter = label_counter;

@@ -1,232 +1,11 @@
 #include "ast.hpp"
 #include "compiler.hpp"
-#include "lua2wasm/runtime.hpp"
 
 #include <functional>
 
 namespace wumbo
 {
 
-void compiler::make_bin_operation()
-{
-    auto make_func = [&](const char* function, const auto& casts, auto&& op)
-    {
-        BinaryenType p[] = {anyref(), anyref()};
-        auto params      = BinaryenTypeCreate(std::data(p), std::size(p));
-        auto vars        = std::array<BinaryenType, 0>{};
-
-        BinaryenAddFunction(mod,
-                            function,
-                            params,
-                            anyref(),
-                            std::data(vars),
-                            std::size(vars),
-                            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type left_type, expr_ref left)
-                                                    {
-                                                        if (std::find(std::begin(casts), std::end(casts), left_type) == std::end(casts))
-                                                            return throw_error(add_string("unexpected type"));
-
-                                                        auto func_name = std::string{function} + to_string(left_type);
-
-                                                        auto p = std::array{type(left_type), anyref()};
-
-                                                        auto params = BinaryenTypeCreate(std::data(p), std::size(p));
-
-                                                        BinaryenAddFunction(mod,
-                                                                            func_name.c_str(),
-                                                                            params,
-                                                                            anyref(),
-                                                                            std::data(vars),
-                                                                            std::size(vars),
-                                                                            make_block(switch_value(local_get(1, anyref()), casts, [&](value_type right_type, expr_ref right)
-                                                                                                    {
-                                                                                                        auto left = local_get(0, type(left_type));
-
-                                                                                                        switch (left_type)
-                                                                                                        {
-                                                                                                        case value_type::integer:
-                                                                                                            left = BinaryenStructGet(mod, 0, left, integer_type(), false);
-                                                                                                            switch (right_type)
-                                                                                                            {
-                                                                                                            case value_type::integer:
-                                                                                                                right = BinaryenStructGet(mod, 0, right, integer_type(), false);
-                                                                                                                break;
-                                                                                                            case value_type::number:
-                                                                                                                right = BinaryenStructGet(mod, 0, right, number_type(), false);
-                                                                                                                break;
-                                                                                                            default:
-                                                                                                                return throw_error(add_string("unexpected type"));
-                                                                                                            }
-                                                                                                            break;
-
-                                                                                                        case value_type::number:
-                                                                                                            left = BinaryenStructGet(mod, 0, left, number_type(), false);
-                                                                                                            switch (right_type)
-                                                                                                            {
-                                                                                                            case value_type::integer:
-                                                                                                                right = BinaryenStructGet(mod, 0, right, integer_type(), false);
-                                                                                                                break;
-                                                                                                            case value_type::number:
-                                                                                                                right = BinaryenStructGet(mod, 0, right, number_type(), false);
-                                                                                                                break;
-                                                                                                            default:
-                                                                                                                return throw_error(add_string("unexpected type"));
-                                                                                                            }
-                                                                                                            break;
-
-                                                                                                        default:
-                                                                                                            semantic_error("unreachable");
-                                                                                                        }
-
-                                                                                                        return op(left_type, right_type, left, right);
-                                                                                                    })));
-
-                                                        auto args = std::array{left, local_get(1, anyref())};
-                                                        return BinaryenReturnCall(mod, func_name.c_str(), std::data(args), std::size(args), anyref());
-                                                    })));
-    };
-
-    {
-        auto casts = std::array{
-            value_type::integer,
-            value_type::number,
-        };
-
-        auto functions = std::array{
-            std::tuple{"*addition", &compiler::add_int, &compiler::add_num},
-            std::tuple{"*subtraction", &compiler::sub_int, &compiler::sub_num},
-            std::tuple{"*multiplication", &compiler::mul_int, &compiler::mul_num},
-            std::tuple{"*division", &compiler::div_int, &compiler::div_num},
-            std::tuple{"*division_floor", &compiler::div_int, &compiler::div_num},
-            std::tuple{"*exponentiation", &compiler::div_int, &compiler::div_num},
-            std::tuple{"*modulo", &compiler::rem_int, &compiler::div_num},
-        };
-
-        for (auto [function, int_op, num_op] : functions)
-        {
-            make_func(function, casts, [&, int_op = int_op, num_op = num_op](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
-                      {
-                          switch (left_type)
-                          {
-                          case value_type::integer:
-                              switch (right_type)
-                              {
-                              case value_type::integer:
-                                  return make_return(new_integer(std::invoke(int_op, this, left, right)));
-                              case value_type::number:
-                                  left = int_to_num(left);
-                                  return make_return(new_number(std::invoke(num_op, this, left, right)));
-                              default:
-                                  return throw_error(add_string("unexpected type"));
-                              }
-
-                          case value_type::number:
-                              switch (right_type)
-                              {
-                              case value_type::integer:
-                                  right = int_to_num(right);
-                                  return make_return(new_number(std::invoke(num_op, this, left, right)));
-                              case value_type::number:
-                                  return make_return(new_number(std::invoke(num_op, this, left, right)));
-                              default:
-                                  return throw_error(add_string("unexpected type"));
-                              }
-                          default:
-                              semantic_error("unreachable");
-                          }
-                      });
-        }
-
-        auto bitop = std::array{
-            std::tuple{"*binary_or", &compiler::or_int},
-            std::tuple{"*binary_and", &compiler::and_int},
-            std::tuple{"*binary_xor", &compiler::xor_int},
-            std::tuple{"*binary_right_shift", &compiler::shr_int},
-            std::tuple{"*binary_left_shift", &compiler::shl_int},
-        };
-
-        for (auto [function, int_op] : bitop)
-        {
-            make_func(function, casts, [&, int_op = int_op](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
-                      {
-                          switch (left_type)
-                          {
-                          case value_type::integer:
-                              switch (right_type)
-                              {
-                              case value_type::integer:
-                                  return make_return(new_integer(std::invoke(int_op, this, left, right)));
-                              case value_type::number:
-                                  //left = int_to_num(left);
-                                  //return make_return(new_number(std::invoke(int_op, this, left, right)));
-                              default:
-                                  return throw_error(add_string("unexpected type"));
-                              }
-
-                          case value_type::number:
-                              switch (right_type)
-                              {
-                              case value_type::integer:
-                                  //right = int_to_num(right);
-                                  //return make_return(new_number(std::invoke(int_op, this, left, right)));
-                              case value_type::number:
-                                  //return make_return(new_number(std::invoke(int_op, this, left, right)));
-                              default:
-                                  return throw_error(add_string("unexpected type"));
-                              }
-                          default:
-                              semantic_error("unreachable");
-                          }
-                      });
-        }
-
-        auto relational = std::array{
-            std::tuple{"*equality", &compiler::eq_int, &compiler::eq_num},
-            std::tuple{"*inequality", &compiler::ne_int, &compiler::ne_num},
-            std::tuple{"*less_than", &compiler::lt_int, &compiler::lt_num},
-            std::tuple{"*greater_than", &compiler::gt_int, &compiler::ge_num},
-            std::tuple{"*less_or_equal", &compiler::le_int, &compiler::le_num},
-            std::tuple{"*greater_or_equal", &compiler::ge_int, &compiler::ge_num},
-        };
-
-        for (auto [function, int_op, num_op] : relational)
-        {
-            make_func(function, casts, [&, int_op = int_op, num_op = num_op](value_type left_type, value_type right_type, expr_ref left, expr_ref right)
-                      {
-                          switch (left_type)
-                          {
-                          case value_type::integer:
-                              switch (right_type)
-                              {
-                              case value_type::integer:
-                                  return make_return(new_boolean(std::invoke(int_op, this, left, right)));
-                              case value_type::number:
-                                  left = int_to_num(left);
-                                  return make_return(new_boolean(std::invoke(num_op, this, left, right)));
-                              default:
-                                  return throw_error(add_string("unexpected type"));
-                              }
-
-                          case value_type::number:
-                              switch (right_type)
-                              {
-                              case value_type::integer:
-                                  right = int_to_num(right);
-                                  return make_return(new_boolean(std::invoke(num_op, this, left, right)));
-                              case value_type::number:
-                                  return make_return(new_boolean(std::invoke(num_op, this, left, right)));
-                              default:
-                                  return throw_error(add_string("unexpected type"));
-                              }
-                          default:
-                              semantic_error("unreachable");
-                          }
-                      });
-        }
-    }
-}
-
-// TODO
 expr_ref compiler::operator()(const bin_operation& p)
 {
     auto lhs = (*this)(p.lhs);
@@ -259,57 +38,57 @@ expr_ref compiler::operator()(const bin_operation& p)
         break;
     };
 
-    const char* func = [&]()
+    auto func = [this](bin_operator op)
     {
-        switch (p.op)
+        switch (op)
         {
         case bin_operator::addition:
-            return "*addition";
+            return functions::addition;
         case bin_operator::subtraction:
-            return "*subtraction";
+            return functions::subtraction;
         case bin_operator::multiplication:
-            return "*multiplication";
+            return functions::multiplication;
         case bin_operator::division:
-            return "*division";
+            return functions::division;
         case bin_operator::division_floor:
-            return "*division_floor";
+            return functions::division_floor;
         case bin_operator::exponentiation:
-            return "*exponentiation";
+            return functions::exponentiation;
         case bin_operator::modulo:
-            return "*modulo";
+            return functions::modulo;
 
         case bin_operator::binary_or:
-            return "*binary_or";
+            return functions::binary_or;
         case bin_operator::binary_and:
-            return "*binary_and";
+            return functions::binary_and;
         case bin_operator::binary_xor:
-            return "*binary_xor";
+            return functions::binary_xor;
         case bin_operator::binary_right_shift:
-            return "*binary_right_shift";
+            return functions::binary_right_shift;
         case bin_operator::binary_left_shift:
-            return "*binary_left_shift";
+            return functions::binary_left_shift;
 
         case bin_operator::equality:
-            return "*equality";
+            return functions::equality;
         case bin_operator::inequality:
-            return "*inequality";
+            return functions::inequality;
         case bin_operator::less_than:
-            return "*less_than";
+            return functions::less_than;
         case bin_operator::greater_than:
-            return "*greater_than";
+            return functions::greater_than;
         case bin_operator::less_or_equal:
-            return "*less_or_equal";
+            return functions::less_or_equal;
         case bin_operator::greater_or_equal:
-            return "*greater_or_equal";
+            return functions::greater_or_equal;
 
-        case bin_operator::concat:
-            return "*concat";
+        //case bin_operator::concat:
+        //    return functions::concat;
         default:
             semantic_error("");
         }
-    }();
+    }(p.op);
 
-    return make_call(func, std::array{lhs, rhs}, anyref());
+    return _runtime.call(func, std::array{lhs, rhs});
 }
 
 expr_ref compiler::operator()(const un_operation& p)
