@@ -198,6 +198,9 @@ struct runtime::op
 
                                                                                                                     return op(self, left_type, right_type, left, right);
                                                                                                                 })));
+
+                                                        auto args = std::array{left, self->local_get(1, anyref())};
+                                                        return BinaryenReturnCall(self->mod, func_name.c_str(), std::data(args), std::size(args), anyref());
                                                     }))};
     }
 };
