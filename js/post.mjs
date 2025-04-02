@@ -16,15 +16,17 @@ const makeImportObject = (override) => {
         arg = new TextDecoder().decode(arg);
         console.log(arg);
       },
-      array: (size) => new Uint8Array(size),
-      set_array: (array, index, value) => (array[index] = value),
     },
     load: {
       load: instantiateBuffer,
     },
-    string: {
-      to_int: () => {},
-      to_float: () => {},
+    native: {
+      toNum: (str) => Number(str),
+      toString: (num) => num.toString(),
+    },
+    buffer: {
+      new: (size) => new Uint8Array(size),
+      set: (array, index, value) => (array[index] = value),
     },
   };
 
@@ -70,8 +72,8 @@ const convertResult = async (result, format, importObject) => {
   }
 };
 
-const runtime = async (optimize, format) => {
-  return await convertResult(generate_runtime(optimize), format, undefined);
+const runtime = async (optimize, format, importObject) => {
+  return await convertResult(generate_runtime(optimize), format, importObject);
 };
 
 const load = async (txt, importObject, optimize, format, standalone) => {
@@ -92,7 +94,7 @@ export const newInstance = async ({
 } = {}) => {
   const importObject = makeImportObject(override);
   if (!standalone) {
-    const [exports, wat] = await runtime(optimize, format);
+    const [exports, wat] = await runtime(optimize, format, importObject);
     importObject.runtime = exports;
   }
 

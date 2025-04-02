@@ -245,10 +245,10 @@ build_return_t runtime::table_set()
     };
 
     //for (auto value : casts)
-    //    compare(to_string(value), value);
+    //    compare(type_name(value), value);
 
     for (auto value : casts)
-        init_table_type_set(to_string(value), value);
+        init_table_type_set(type_name(value), value);
 
     return {std::vector<BinaryenType>{}, make_block(switch_value(key, casts, [&](value_type type, expr_ref exp)
                                                                  {
@@ -360,10 +360,10 @@ build_return_t runtime::table_get()
     };
 
     for (auto value : casts)
-        compare(to_string(value), value);
+        compare(type_name(value), value);
 
     for (auto value : casts)
-        init_table_type_get(to_string(value), value);
+        init_table_type_get(type_name(value), value);
 
     return {std::vector<BinaryenType>{},
 
@@ -448,6 +448,54 @@ build_return_t runtime::to_bool_not()
                                         }
                                     }))};
 }
+
+build_return_t runtime::to_string()
+{
+    //import_func("toString", BinaryenType params, BinaryenType results, "native");
+    return {std::vector<BinaryenType>{}, BinaryenUnreachable(mod)};
+}
+
+build_return_t runtime::to_number()
+{
+    return {std::vector<BinaryenType>{}, BinaryenUnreachable(mod)};
+}
+
+build_return_t runtime::lua_str_to_js_array()
+{
+    import_func("buffer_new", size_type(), BinaryenTypeExternref(), "buffer", "new");
+    import_func("buffer_set", create_type(BinaryenTypeExternref(), size_type(), size_type()), BinaryenTypeNone(), "buffer", "set");
+
+    auto str     = local_get(0, type<value_type::string>()); // get string
+    auto str_len = array_len(str);                           // get string len
+
+    return {std::vector<BinaryenType>{
+                size_type(),
+                BinaryenTypeExternref(),
+            },
+            make_block(std::array{
+                local_set(1, str_len),
+                local_set(2, make_call("buffer_new", str_len, BinaryenTypeExternref())),
+                make_if(local_get(1, size_type()),
+                        BinaryenLoop(mod,
+                                     "+loop",
+                                     make_block(std::array{
+                                         make_call("buffer_set",
+                                                   std::array{
+                                                       local_get(2, BinaryenTypeExternref()),
+                                                       local_tee(1, BinaryenBinary(mod, BinaryenSubInt32(), local_get(1, size_type()), const_i32(1)), size_type()),
+                                                       array_get(str, local_get(1, size_type()), char_type()),
+                                                   },
+                                                   BinaryenTypeNone()),
+                                         BinaryenBreak(mod,
+                                                       "+loop",
+                                                       local_get(1, size_type()),
+                                                       nullptr),
+                                     }))),
+
+                make_return(local_get(2, BinaryenTypeExternref())),
+            })};
+}
+
 build_return_t runtime::invoke()
 {
     auto casts = std::array{

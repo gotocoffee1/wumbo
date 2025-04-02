@@ -9,55 +9,8 @@ expr_ref_list compiler::open_basic_lib()
     BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "print_string", "print", "string", BinaryenTypeExternref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
-    BinaryenAddFunctionImport(mod, "new_u8array", "print", "array", size_type(), BinaryenTypeExternref());
-    BinaryenAddFunctionImport(mod, "str_to_int", "string", "to_int", BinaryenTypeExternref(), integer_type());
-    BinaryenAddFunctionImport(mod, "str_to_float", "string", "to_float", BinaryenTypeExternref(), number_type());
-
-    {
-        BinaryenType types[] = {
-            BinaryenTypeExternref(),
-            size_type(),
-            size_type(),
-        };
-        BinaryenAddFunctionImport(mod, "set_array", "print", "set_array", BinaryenTypeCreate(std::data(types), std::size(types)), BinaryenTypeNone());
-    }
-    {
-        BinaryenType locals[] = {
-            size_type(),
-            BinaryenTypeExternref(),
-        };
-
-        auto str     = local_get(0, type<value_type::string>()); // get string
-        auto str_len = array_len(str);                           // get string len
-        BinaryenAddFunction(mod,
-                            "*lua_str_to_js_array",
-                            type<value_type::string>(),
-                            BinaryenTypeExternref(),
-                            std::data(locals),
-                            std::size(locals),
-                            make_block(std::array{
-                                local_set(1, str_len),
-                                local_set(2, make_call("new_u8array", str_len, BinaryenTypeExternref())),
-                                make_if(local_get(1, size_type()),
-                                        BinaryenLoop(mod,
-                                                     "+loop",
-                                                     make_block(std::array{
-                                                         make_call("set_array",
-                                                                   std::array{
-                                                                       local_get(2, BinaryenTypeExternref()),
-                                                                       local_tee(1, BinaryenBinary(mod, BinaryenSubInt32(), local_get(1, size_type()), const_i32(1)), size_type()),
-                                                                       array_get(str, local_get(1, size_type()), char_type()),
-                                                                   },
-                                                                   BinaryenTypeNone()),
-                                                         BinaryenBreak(mod,
-                                                                       "+loop",
-                                                                       local_get(1, size_type()),
-                                                                       nullptr),
-                                                     }))),
-
-                                make_return(local_get(2, BinaryenTypeExternref())),
-                            }));
-    }
+    BinaryenAddFunctionImport(mod, "str_to_int", "native", "toNum", BinaryenTypeExternref(), integer_type());
+    BinaryenAddFunctionImport(mod, "str_to_float", "native", "toNum", BinaryenTypeExternref(), number_type());
 
     expr_ref_list result;
 
@@ -182,7 +135,7 @@ expr_ref_list compiler::open_basic_lib()
                      case value_type::string:
                      {
                          func = "print_string";
-                         exp  = make_call("*lua_str_to_js_array", exp, BinaryenTypeExternref());
+                         exp = _runtime.call(functions::lua_str_to_js_array, exp);
                          break;
                      }
                      case value_type::function:
@@ -241,7 +194,7 @@ expr_ref_list compiler::open_basic_lib()
                                          case value_type::number:
                                              return make_return(make_ref_array(exp));
                                          case value_type::string:
-                                             exp = make_call("*lua_str_to_js_array", exp, BinaryenTypeExternref());
+                                             exp = _runtime.call(functions::lua_str_to_js_array, exp);
                                              exp = make_call("str_to_float", exp, number_type());
                                              exp = new_number(exp);
 

@@ -39,6 +39,33 @@ enum class value_type
     table,
 };
 
+inline const char* type_name(value_type vtype)
+{
+    switch (vtype)
+    {
+    case value_type::nil:
+        return "nil";
+    case value_type::boolean:
+        return "boolean";
+    case value_type::integer:
+        return "integer";
+    case value_type::number:
+        return "number";
+    case value_type::string:
+        return "string";
+    case value_type::function:
+        return "function";
+    case value_type::userdata:
+        return "userdata";
+    case value_type::thread:
+        return "thread";
+    case value_type::table:
+        return "table";
+    default:
+        return "";
+    }
+}
+
 using expr_ref      = BinaryenExpressionRef;
 using expr_ref_list = std::vector<expr_ref>;
 
@@ -159,9 +186,9 @@ struct ext_types : utils
         return BinaryenArrayNewData(mod, BinaryenTypeGetHeapType(type<value_type::string>()), name.c_str(), const_i32(0), const_i32(str.size()));
     }
 
-    void import_func(const char* name, BinaryenType params, BinaryenType results, const char* module_name)
+    void import_func(const char* name, BinaryenType params, BinaryenType results, const char* module_name, const char* import_name = nullptr)
     {
-        BinaryenAddFunctionImport(mod, name, module_name, name, params, results);
+        BinaryenAddFunctionImport(mod, name, module_name, import_name ? import_name : name, params, results);
     }
 
     static constexpr size_t type_count = 12;
@@ -344,33 +371,6 @@ struct ext_types : utils
 
     std::size_t label_counter = 0;
 
-    static const char* to_string(value_type vtype)
-    {
-        switch (vtype)
-        {
-        case value_type::nil:
-            return "nil";
-        case value_type::boolean:
-            return "boolean";
-        case value_type::integer:
-            return "integer";
-        case value_type::number:
-            return "number";
-        case value_type::string:
-            return "string";
-        case value_type::function:
-            return "function";
-        case value_type::userdata:
-            return "userdata";
-        case value_type::thread:
-            return "thread";
-        case value_type::table:
-            return "table";
-        default:
-            return "";
-        }
-    }
-
     template<typename F>
     auto switch_value(expr_ref exp, nonstd::span<const value_type> casts, F&& code)
     {
@@ -380,7 +380,7 @@ struct ext_types : utils
 
         for (auto vtype : casts)
         {
-            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), (to_string(vtype) + std::to_string(label_counter++)).c_str(), exp, type(vtype));
+            exp = BinaryenBrOn(mod, BinaryenBrOnCast(), (type_name(vtype) + std::to_string(label_counter++)).c_str(), exp, type(vtype));
         }
 
         expr_ref inner[] = {
@@ -390,7 +390,7 @@ struct ext_types : utils
         bool once = false;
         for (auto vtype : casts)
         {
-            exp  = BinaryenBlock(mod, (to_string(vtype) + std::to_string(counter++)).c_str(), once ? &exp : std::data(inner), once ? 1 : std::size(inner), BinaryenTypeAuto());
+            exp  = BinaryenBlock(mod, (type_name(vtype) + std::to_string(counter++)).c_str(), once ? &exp : std::data(inner), once ? 1 : std::size(inner), BinaryenTypeAuto());
             exp  = code(vtype, exp);
             once = true;
         }

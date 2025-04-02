@@ -144,7 +144,7 @@ struct runtime::op
                                                         if (std::find(std::begin(op.casts), std::end(op.casts), left_type) == std::end(op.casts))
                                                             return self->throw_error(self->add_string("unexpected type"));
 
-                                                        auto func_name = std::string{function} + self->to_string(left_type);
+                                                        auto func_name = std::string{function} + type_name(left_type);
 
                                                         auto p = std::array{self->type(left_type), anyref()};
 
