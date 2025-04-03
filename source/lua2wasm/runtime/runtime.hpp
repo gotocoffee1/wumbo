@@ -32,7 +32,7 @@
     DO(less_or_equal, create_type(anyref(), anyref()), anyref())                 \
     DO(greater_or_equal, create_type(anyref(), anyref()), anyref())              \
     DO(to_string, anyref(), anyref())                                            \
-    DO(to_number, anyref(), anyref())                                            \
+    DO(to_number, type<value_type::string>(), anyref())                                            \
     DO(lua_str_to_js_array, type<value_type::string>(), BinaryenTypeExternref()) \
     DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 

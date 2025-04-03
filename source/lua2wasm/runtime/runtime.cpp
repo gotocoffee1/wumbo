@@ -457,7 +457,25 @@ build_return_t runtime::to_string()
 
 build_return_t runtime::to_number()
 {
-    return {std::vector<BinaryenType>{}, BinaryenUnreachable(mod)};
+    import_func("str_to_int", BinaryenTypeExternref(), integer_type(), "native", "toNum");
+
+    auto casts = std::array{
+        value_type::string,
+    };
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        switch (type)
+                                        {
+                                        case value_type::string:
+                                            exp = call(functions::lua_str_to_js_array, exp);
+                                            exp = make_call("str_to_int", exp, integer_type());
+                                            exp = new_number(exp);
+                                            return make_return(exp);
+                                        default:
+                                            return make_return(null());
+                                        }
+                                    }))};
 }
 
 build_return_t runtime::lua_str_to_js_array()
