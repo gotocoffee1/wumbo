@@ -7,6 +7,7 @@ const instantiateBuffer = async (buffer, importObject) => {
 };
 
 const makeImportObject = (override) => {
+  const bufToStr = (str) => new TextDecoder().decode(str);
   const importObject = {
     print: {
       value: (arg) => {
@@ -21,7 +22,7 @@ const makeImportObject = (override) => {
       load: instantiateBuffer,
     },
     native: {
-      toNum: (str) => Number(str),
+      toNum: (str) => BigInt(Number(bufToStr(str))),
       toString: (num) => num.toString(),
     },
     buffer: {

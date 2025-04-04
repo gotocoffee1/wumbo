@@ -366,7 +366,6 @@ build_return_t runtime::table_get()
         init_table_type_get(type_name(value), value);
 
     return {std::vector<BinaryenType>{},
-
             make_block(switch_value(key,
                                     casts,
                                     [&](value_type type, expr_ref exp)
@@ -412,7 +411,6 @@ build_return_t runtime::to_bool()
     auto casts = std::array{
         value_type::boolean,
     };
-
     return {std::vector<BinaryenType>{},
             make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
                                     {
@@ -470,7 +468,7 @@ build_return_t runtime::to_number()
                                         case value_type::string:
                                             exp = call(functions::lua_str_to_js_array, exp);
                                             exp = make_call("str_to_int", exp, integer_type());
-                                            exp = new_number(exp);
+                                            exp = new_integer(exp);
                                             return make_return(exp);
                                         default:
                                             return make_return(null());

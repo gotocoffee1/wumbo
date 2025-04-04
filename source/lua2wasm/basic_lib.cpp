@@ -1,4 +1,5 @@
 #include "compiler.hpp"
+#include <array>
 
 namespace wumbo
 {
@@ -9,8 +10,6 @@ expr_ref_list compiler::open_basic_lib()
     BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "print_string", "print", "string", BinaryenTypeExternref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
-    BinaryenAddFunctionImport(mod, "str_to_int", "native", "toNum", BinaryenTypeExternref(), integer_type());
-    BinaryenAddFunctionImport(mod, "str_to_float", "native", "toNum", BinaryenTypeExternref(), number_type());
 
     expr_ref_list result;
 
@@ -74,14 +73,14 @@ expr_ref_list compiler::open_basic_lib()
             const char* tags[] = {error_tag};
             expr_ref catches[] = {
                 x ? make_block(std::array{
-                    local_set(exception, BinaryenPop(mod, anyref())),
-                    drop(call(get_var("msgh"), make_ref_array(local_get(exception, anyref())))),
-                    make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
-                })
+                        local_set(exception, BinaryenPop(mod, anyref())),
+                        drop(call(get_var("msgh"), make_ref_array(local_get(exception, anyref())))),
+                        make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                    })
                   : make_block(std::array{
-                      local_set(exception, BinaryenPop(mod, anyref())),
-                      make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
-                  }),
+                        local_set(exception, BinaryenPop(mod, anyref())),
+                        make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                    }),
             };
 
             auto try_ = BinaryenTry(mod,
@@ -135,7 +134,7 @@ expr_ref_list compiler::open_basic_lib()
                      case value_type::string:
                      {
                          func = "print_string";
-                         exp = _runtime.call(functions::lua_str_to_js_array, exp);
+                         exp  = _runtime.call(functions::lua_str_to_js_array, exp);
                          break;
                      }
                      case value_type::function:
@@ -150,7 +149,6 @@ expr_ref_list compiler::open_basic_lib()
                          make_return(null()),
                      });
                  };
-
                  return switch_value(exp, casts, s);
              });
     add_func("rawequal", {"v1", "v2"}, false, [this]()
@@ -180,29 +178,8 @@ expr_ref_list compiler::open_basic_lib()
     add_func("tonumber", {"e", "base"}, false, [this]()
              {
                  auto e = get_var("e");
-
-                 auto casts = std::array{
-                     value_type::string,
-                     value_type::number,
-                     value_type::integer,
-                 };
-                 return switch_value(e, casts, [&](value_type type, expr_ref exp)
-                                     {
-                                         switch (type)
-                                         {
-                                         case value_type::integer:
-                                         case value_type::number:
-                                             return make_return(make_ref_array(exp));
-                                         case value_type::string:
-                                             exp = _runtime.call(functions::lua_str_to_js_array, exp);
-                                             exp = make_call("str_to_float", exp, number_type());
-                                             exp = new_number(exp);
-
-                                             return make_return(make_ref_array(exp));
-                                         default:
-                                             return make_return(null());
-                                         }
-                                     });
+                 e      = _runtime.call(functions::to_number, e);
+                 return std::array{make_return(make_ref_array(e))};
              });
     add_func("tostring", {"v"}, false, [this]()
              {
@@ -259,9 +236,9 @@ expr_ref_list compiler::open_basic_lib()
 
                                          auto ret = make_return(make_ref_array(add_string(str)));
                                          return exp ? make_block(std::array{
-                                                    drop(exp),
-                                                    ret,
-                                                })
+                                                          drop(exp),
+                                                          ret,
+                                                      })
                                                     : ret;
                                      });
              });
