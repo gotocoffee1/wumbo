@@ -449,10 +449,10 @@ build_return_t runtime::to_bool_not()
 
 build_return_t runtime::to_string()
 {
-    import_func("toString", integer_type(), BinaryenTypeExternref(), "native", "toString");
+    import_func("int_to_str", integer_type(), BinaryenTypeExternref(), "native", "toString");
+    import_func("num_to_str", number_type(), BinaryenTypeExternref(), "native", "toString");
     auto casts = std::array{
         value_type::string,
-        value_type::nil,
         value_type::number,
         value_type::integer,
     };
@@ -461,29 +461,38 @@ build_return_t runtime::to_string()
                                     {
                                         switch (type)
                                         {
-                                        //case value_type::nil:
-                                         //   return make_return(add_string("nil"));
+                                        case value_type::nil:
+                                            exp = add_string("nil");
+                                            break;
                                         case value_type::string:
-                                            return make_return(exp);
+                                            break;
                                         case value_type::integer:
                                             exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
-                                            exp = make_call("toString", exp, BinaryenTypeExternref());
+                                            exp = make_call("int_to_str", exp, BinaryenTypeExternref());
                                             exp = call(functions::js_array_to_lua_str, exp);
-                                            return make_return(exp);
+                                            break;
+                                        case value_type::number:
+                                            exp = BinaryenStructGet(mod, 0, exp, integer_type(), false);
+                                            exp = make_call("num_to_str", exp, BinaryenTypeExternref());
+                                            exp = call(functions::js_array_to_lua_str, exp);
+                                            break;
                                         default:
-
-                                            //return make_return(add_string("nil"));
-                                            return make_return(null());
+                                            exp = null();
+                                            break;
                                         }
+                                        return make_return(exp);
                                     }))};
 }
 
 build_return_t runtime::to_number()
 {
-    import_func("str_to_int", BinaryenTypeExternref(), integer_type(), "native", "toNum");
+    import_func("str_to_int", BinaryenTypeExternref(), integer_type(), "native", "toInt");
+    import_func("str_to_num", BinaryenTypeExternref(), number_type(), "native", "toNum");
 
     auto casts = std::array{
         value_type::string,
+        value_type::number,
+        value_type::integer,
     };
     return {std::vector<BinaryenType>{},
             make_block(switch_value(local_get(0, anyref()), casts, [&](value_type type, expr_ref exp)
@@ -492,12 +501,17 @@ build_return_t runtime::to_number()
                                         {
                                         case value_type::string:
                                             exp = call(functions::lua_str_to_js_array, exp);
-                                            exp = make_call("str_to_int", exp, integer_type());
-                                            exp = new_integer(exp);
-                                            return make_return(exp);
+                                            exp = make_call("str_to_num", exp, number_type());
+                                            exp = new_number(exp);
+                                            break;
+                                        case value_type::integer:
+                                        case value_type::number:
+                                            break;
                                         default:
-                                            return make_return(null());
+                                            exp = null();
+                                            break;
                                         }
+                                        return make_return(exp);
                                     }))};
 }
 

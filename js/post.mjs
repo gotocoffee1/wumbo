@@ -19,7 +19,8 @@ const makeImportObject = (override) => {
       load: instantiateBuffer,
     },
     native: {
-      toNum: (str) => BigInt(Number(bufToStr(str))),
+      toNum: (str) => Number(bufToStr(str)),
+      toInt: (str) => BigInt(Number(bufToStr(str))),
       toString: (num) => strToBuf(num.toString()),
     },
     buffer: {
