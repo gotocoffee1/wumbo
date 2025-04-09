@@ -1,4 +1,5 @@
 #include "compiler.hpp"
+#include "lua2wasm/runtime/runtime.hpp"
 #include <array>
 
 namespace wumbo
@@ -6,10 +7,7 @@ namespace wumbo
 
 expr_ref_list compiler::open_basic_lib()
 {
-    BinaryenAddFunctionImport(mod, "print_integer", "print", "value", integer_type(), BinaryenTypeNone());
-    BinaryenAddFunctionImport(mod, "print_number", "print", "value", number_type(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "print_string", "print", "string", BinaryenTypeExternref(), BinaryenTypeNone());
-    BinaryenAddFunctionImport(mod, "print_nil", "print", "value", BinaryenTypeNullref(), BinaryenTypeNone());
 
     expr_ref_list result;
 
@@ -102,54 +100,12 @@ expr_ref_list compiler::open_basic_lib()
                  auto exp = (*this)(ellipsis{});
 
                  exp = array_get(exp, const_i32(0), anyref());
-
-                 auto casts = std::array{
-                     //    value_type::boolean,
-                     value_type::number,
-                     value_type::integer,
-                     value_type::string,
+                 exp = _runtime.call(functions::to_string, exp);
+                 exp = _runtime.call(functions::lua_str_to_js_array, exp);
+                 return std::array{
+                     make_call("print_string", exp, BinaryenTypeNone()),
+                     make_return(null()),
                  };
-
-                 auto s = [&](value_type type, expr_ref exp)
-                 {
-                     const char* func;
-                     switch (type)
-                     {
-                     case value_type::nil:
-                         exp  = null();
-                         func = "print_nil";
-                         break;
-                     case value_type::boolean:
-                         exp  = null();
-                         func = "print_nil";
-                         break;
-                     case value_type::integer:
-                         func = "print_integer";
-                         exp  = BinaryenStructGet(mod, 0, exp, integer_type(), false);
-                         break;
-                     case value_type::number:
-                         func = "print_number";
-                         exp  = BinaryenStructGet(mod, 0, exp, number_type(), false);
-                         break;
-                     case value_type::string:
-                     {
-                         func = "print_string";
-                         exp  = _runtime.call(functions::lua_str_to_js_array, exp);
-                         break;
-                     }
-                     case value_type::function:
-                     case value_type::userdata:
-                     case value_type::thread:
-                     case value_type::table:
-                     default:
-                         return BinaryenUnreachable(mod);
-                     }
-                     return make_block(std::array{
-                         make_call(func, exp, BinaryenTypeNone()),
-                         make_return(null()),
-                     });
-                 };
-                 return switch_value(exp, casts, s);
              });
     add_func("rawequal", {"v1", "v2"}, false, [this]()
              {
@@ -183,7 +139,8 @@ expr_ref_list compiler::open_basic_lib()
              });
     add_func("tostring", {"v"}, false, [this]()
              {
-                 return std::array{BinaryenUnreachable(mod)};
+                 auto exp = _runtime.call(functions::to_string, get_var("v"));
+                 return std::array{make_return(make_ref_array(exp))};
              });
     add_func("type", {"v"}, false, [this]()
              {

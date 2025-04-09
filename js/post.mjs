@@ -7,15 +7,12 @@ const instantiateBuffer = async (buffer, importObject) => {
 };
 
 const makeImportObject = (override) => {
-  const bufToStr = (str) => new TextDecoder().decode(str);
+  const bufToStr = (buf) => new TextDecoder().decode(buf);
+  const strToBuf = (str) => new TextEncoder().encode(str);
   const importObject = {
     print: {
-      value: (arg) => {
-        console.log(arg);
-      },
       string: (arg) => {
-        arg = new TextDecoder().decode(arg);
-        console.log(arg);
+        console.log(bufToStr(arg));
       },
     },
     load: {
@@ -23,11 +20,13 @@ const makeImportObject = (override) => {
     },
     native: {
       toNum: (str) => BigInt(Number(bufToStr(str))),
-      toString: (num) => num.toString(),
+      toString: (num) => strToBuf(num.toString()),
     },
     buffer: {
       new: (size) => new Uint8Array(size),
       set: (array, index, value) => (array[index] = value),
+      get: (array, index) => array[index],
+      size: (array) => array.length,
     },
   };
 

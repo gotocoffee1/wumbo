@@ -127,6 +127,11 @@ struct utils
         return BinaryenArrayLen(mod, array);
     }
 
+    expr_ref array_set(expr_ref array, expr_ref index, expr_ref value)
+    {
+        return BinaryenArraySet(mod, array, index, value);
+    }
+
     expr_ref array_get(expr_ref array, expr_ref index, BinaryenType type, bool is_signed = false)
     {
         return BinaryenArrayGet(mod, array, index, type, is_signed);
@@ -531,7 +536,7 @@ struct ext_types : utils
                 array_def{
                     char_type(),
                     BinaryenPackedTypeInt8(),
-                    false,
+                    true,
                 },
             },
             {
