@@ -1,3 +1,4 @@
+#include "ast.hpp"
 #include "compiler.hpp"
 
 namespace wumbo
@@ -58,12 +59,44 @@ expr_ref_list compiler::operator()(const repeat_statement& p)
     return {BinaryenLoop(mod, begin.c_str(), make_block(body, end.c_str()))};
 }
 
+
+// TODO: make compatile to lua spec
 expr_ref_list compiler::operator()(const for_statement& p)
 {
-    loop_scope scope{_func_stack};
-    auto begin = loop_begin(this);
-    auto end   = loop_end(this);
-    expr_ref_list result;
+    block_scope block{_func_stack};
+
+    local_variables vars_help;
+    vars_help.explist = p.exp;
+    vars_help.names   = {"*var", "*limit", "*step"};
+
+    expr_ref_list result = {(*this)(vars_help)};
+
+    bin_operation cmp;
+    cmp.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*limit");
+    cmp.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
+    cmp.op = bin_operator::greater_or_equal;
+    while_statement w;
+    w.condition.inner.emplace<box<bin_operation>>(std::move(cmp));
+    local_variables counter;
+    counter.names = {p.var};
+    counter.explist.emplace_back().inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
+    w.inner.statements.emplace_back().inner.emplace<local_variables>(std::move(counter));
+    append(w.inner.statements, p.inner.statements);
+    w.inner.retstat = p.inner.retstat;
+
+
+    bin_operation inc;
+    inc.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
+    inc.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*step");
+    inc.op = bin_operator::addition;
+
+    assignments assign;
+    assign.varlist.emplace_back().head.emplace<name_t>("*var");
+    assign.explist.emplace_back().inner.emplace<box<bin_operation>>(inc);
+    w.inner.statements.emplace_back().inner.emplace<assignments>(std::move(assign));
+
+    append(result, (*this)(w));
+
     return result;
 }
 expr_ref_list compiler::operator()(const for_each& p)

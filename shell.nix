@@ -27,6 +27,7 @@ pkgs.mkShell {
       unstable.emscripten
       python3
       nodejs_23
+      lua5_3
     ];
   shellHook = ''
     export VCPKG_ROOT=${pkgs.vcpkg}/share/vcpkg

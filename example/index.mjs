@@ -2,10 +2,10 @@ import { newInstance } from "./wumbo.mjs";
 import fs from "fs/promises";
 
 const load = await newInstance({ optimize: true });
-//console.log(load);
-//console.time("lua");
+console.time("compile");
 const data = await fs.readFile("init.lua");
 const [f, wat] = await load(data);
-//console.log(wat);
-//console.timeEnd("lua");
+console.timeEnd("compile");
+console.time("run");
 f();
+console.timeEnd("run");
