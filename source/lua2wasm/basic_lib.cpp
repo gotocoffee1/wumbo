@@ -7,7 +7,7 @@ namespace wumbo
 
 expr_ref_list compiler::open_basic_lib()
 {
-    BinaryenAddFunctionImport(mod, "print_string", "print", "string", BinaryenTypeExternref(), BinaryenTypeNone());
+    BinaryenAddFunctionImport(mod, "stdout", "native", "stdout", BinaryenTypeExternref(), BinaryenTypeNone());
 
     expr_ref_list result;
 
@@ -102,8 +102,10 @@ expr_ref_list compiler::open_basic_lib()
                  exp = array_get(exp, const_i32(0), anyref());
                  exp = _runtime.call(functions::to_string, exp);
                  exp = _runtime.call(functions::lua_str_to_js_array, exp);
+
                  return std::array{
-                     make_call("print_string", exp, BinaryenTypeNone()),
+                     make_call("stdout", exp, BinaryenTypeNone()), 
+                     make_call("stdout", _runtime.call(functions::lua_str_to_js_array, add_string("\n")), BinaryenTypeNone()),
                      make_return(null()),
                  };
              });

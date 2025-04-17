@@ -10,15 +10,12 @@ const makeImportObject = (override) => {
   const bufToStr = (buf) => new TextDecoder().decode(buf);
   const strToBuf = (str) => new TextEncoder().encode(str);
   const importObject = {
-    print: {
-      string: (arg) => {
-        console.log(bufToStr(arg));
-      },
-    },
     load: {
       load: instantiateBuffer,
     },
     native: {
+      stdout: (str) => console.log(bufToStr(arg)),
+      stderr: (str) => console.error(bufToStr(arg)),
       toNum: (str) => Number(bufToStr(str)),
       toInt: (str) => BigInt(Number(bufToStr(str))),
       toString: (num) => strToBuf(num.toString()),
