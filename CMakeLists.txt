@@ -108,7 +108,16 @@ set_target_properties(
   EXPORT_NAME wumbo
   OUTPUT_NAME wumbo)
 
+#add_subdirectory(benchmark)
+
 # ---- Install rules ----
 if(NOT CMAKE_SKIP_INSTALL_RULES)
   #include(cmake/install-rules.cmake)
 endif()
+
+include(CTest)
+
+if(BUILD_TESTING)
+  add_subdirectory(test)
+endif()
+

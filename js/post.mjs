@@ -14,11 +14,12 @@ const makeImportObject = (override) => {
       load: instantiateBuffer,
     },
     native: {
-      stdout: (str) => console.log(bufToStr(arg)),
-      stderr: (str) => console.error(bufToStr(arg)),
+      stdout: (str) => console.log(bufToStr(str)),
+      stderr: (str) => console.error(bufToStr(str)),
       toNum: (str) => Number(bufToStr(str)),
       toInt: (str) => BigInt(Number(bufToStr(str))),
       toString: (num) => strToBuf(num.toString()),
+      pow: (base, exponent) => Math.pow(base, exponent),
     },
     buffer: {
       new: (size) => new Uint8Array(size),

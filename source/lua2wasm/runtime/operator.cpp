@@ -1,4 +1,6 @@
+#include "binaryen-c.h"
 #include "runtime.hpp"
+#include "wasm_util.hpp"
 
 #include <functional>
 
@@ -7,6 +9,45 @@ namespace wumbo
 
 struct runtime::op
 {
+    struct expo
+    {
+        static constexpr auto casts = std::array{
+            value_type::integer,
+            value_type::number,
+        };
+
+        expr_ref operator()(runtime* self, value_type left_type, value_type right_type, expr_ref left, expr_ref right)
+        {
+            switch (left_type)
+            {
+            case value_type::integer:
+                left = self->int_to_num(left);
+                switch (right_type)
+                {
+                case value_type::integer:
+                    right = self->int_to_num(right);
+                case value_type::number:
+                    return self->make_return(self->new_number(self->make_call("pow", std::array{left, right}, number_type())));
+                default:
+                    return self->throw_error(self->add_string("unexpected type"));
+                }
+
+            case value_type::number:
+                switch (right_type)
+                {
+                case value_type::integer:
+                    right = self->int_to_num(right);
+                case value_type::number:
+                    return self->make_return(self->new_number(self->make_call("pow", std::array{left, right}, number_type())));
+                default:
+                    return self->throw_error(self->add_string("unexpected type"));
+                }
+            default:
+                self->semantic_error("unreachable");
+            }
+        }
+    };
+
     struct arith
     {
         expr_ref (runtime::*int_op)(expr_ref, expr_ref);
@@ -232,7 +273,8 @@ build_return_t runtime::division_floor()
 
 build_return_t runtime::exponentiation()
 {
-    return op::bin(this, "exponentiation", op::arith{&runtime::div_int, &runtime::div_num});
+    import_func("pow", create_type(number_type(), number_type()), number_type(), "native", "pow");
+    return op::bin(this, "exponentiation", op::expo{});
 }
 
 build_return_t runtime::modulo()
