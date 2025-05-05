@@ -1,8 +1,8 @@
 #include "runtime.hpp"
 
 #include "binaryen-c.h"
-#include "type.hpp"
-#include "wasm_util.hpp"
+#include "utils/type.hpp"
+#include "backend/wasm_util.hpp"
 
 #include <array>
 #include <functional>

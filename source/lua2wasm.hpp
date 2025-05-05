@@ -1,7 +1,7 @@
 #pragma once
 
-#include "ast.hpp"
-#include "wasm.hpp"
+#include "ast/ast.hpp"
+#include "backend/wasm.hpp"
 
 namespace wumbo
 {

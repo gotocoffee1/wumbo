@@ -1,7 +1,7 @@
 #pragma once
 
 #include "binaryen-c.h"
-#include "wasm_util.hpp"
+#include "backend/wasm_util.hpp"
 #include <type_traits>
 
 #define RUNTIME_FUNCTIONS(DO)                                                    \

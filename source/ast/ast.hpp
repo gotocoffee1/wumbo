@@ -1,7 +1,7 @@
 #pragma once
 
-#include "box.hpp"
-#include "type.hpp"
+#include "utils/box.hpp"
+#include "utils/type.hpp"
 #include <optional>
 #include <string>
 #include <variant>
@@ -23,7 +23,7 @@ struct boolean
 };
 
 using float_type = double;
-using int_type   = std::int64_t;
+using int_type   = int64_t;
 
 struct literal
 {
@@ -280,7 +280,7 @@ struct statement
 };
 } // namespace ast
 
-#include "util.hpp"
+#include "utils/util.hpp"
 #include <ostream>
 #include <string_view>
 

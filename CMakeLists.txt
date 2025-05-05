@@ -14,18 +14,18 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 
 
 add_library(wumbo
-  "source/parser.cpp"
+  "source/frontend/parser.cpp"
   "source/lua2wasm.cpp"
-  "source/wasm.cpp"
-  "source/lua2wasm/locals.cpp"
-  "source/lua2wasm/runtime/runtime.cpp"
-  "source/lua2wasm/runtime/operator.cpp"
-  "source/lua2wasm/assignment_call.cpp"
-  "source/lua2wasm/expression.cpp"
-  "source/lua2wasm/table.cpp"
-  "source/lua2wasm/loop.cpp"
-  "source/lua2wasm/basic_lib.cpp"
-  "source/lua2wasm/operators.cpp")
+  "source/backend/wasm.cpp"
+  "source/backend/locals.cpp"
+  "source/backend/runtime/runtime.cpp"
+  "source/backend/runtime/operator.cpp"
+  "source/backend/assignment_call.cpp"
+  "source/backend/expression.cpp"
+  "source/backend/table.cpp"
+  "source/backend/loop.cpp"
+  "source/backend/basic_lib.cpp"
+  "source/backend/operators.cpp")
 
 add_library(wumbo::wumbo ALIAS wumbo)
 
@@ -72,7 +72,7 @@ target_link_libraries(wumbo
   binaryen)
 
 target_include_directories(wumbo PRIVATE ${binaryen_SOURCE_DIR}/src)
-target_include_directories(wumbo PRIVATE source)
+target_include_directories(wumbo PUBLIC source)
 
 
 if (EMSCRIPTEN)

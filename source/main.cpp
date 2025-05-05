@@ -1,6 +1,6 @@
-#include "ast.hpp"
+#include "ast/ast.hpp"
 #include "lua2wasm.hpp"
-#include "wasm.hpp"
+#include "backend/wasm.hpp"
 
 #include <ostream>
 #include <string_view>

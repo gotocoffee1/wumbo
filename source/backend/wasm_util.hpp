@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "nonstd/span.hpp"
-#include "util.hpp"
+#include "utils/util.hpp"
 
 namespace wumbo
 {

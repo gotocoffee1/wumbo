@@ -1,5 +1,5 @@
 #include "compiler.hpp"
-#include "lua2wasm/runtime/runtime.hpp"
+#include "runtime/runtime.hpp"
 #include <array>
 
 namespace wumbo

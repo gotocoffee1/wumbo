@@ -5,9 +5,9 @@
 #include <cassert>
 #include <vector>
 
-#include "ast.hpp"
+#include "ast/ast.hpp"
 #include "runtime/runtime.hpp"
-#include "util.hpp"
+#include "utils/util.hpp"
 #include "wasm.hpp"
 #include "wasm_util.hpp"
 

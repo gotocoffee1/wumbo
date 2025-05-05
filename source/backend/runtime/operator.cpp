@@ -1,6 +1,7 @@
-#include "binaryen-c.h"
 #include "runtime.hpp"
-#include "wasm_util.hpp"
+
+#include "binaryen-c.h"
+#include "backend/wasm_util.hpp"
 
 #include <functional>
 

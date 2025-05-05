@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ast.hpp"
+#include "ast/ast.hpp"
 #include "parser.hpp"
 
 #include <tao/pegtl/contrib/unescape.hpp>

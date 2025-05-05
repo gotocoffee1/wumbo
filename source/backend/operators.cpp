@@ -1,4 +1,4 @@
-#include "ast.hpp"
+#include "ast/ast.hpp"
 #include "compiler.hpp"
 
 #include <functional>

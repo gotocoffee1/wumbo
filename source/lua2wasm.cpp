@@ -1,6 +1,6 @@
 #include "lua2wasm.hpp"
 
-#include "lua2wasm/compiler.hpp"
+#include "backend/compiler.hpp"
 
 namespace wumbo
 {
