@@ -42,8 +42,9 @@ expr_ref_list compiler::open_basic_lib()
              });
     add_func("load", {"chunk", "chunkname", "mode", "env"}, true, [this]()
              {
-                 auto exp = get_var("f");
-                 return std::array{throw_error(get_var("message"))};
+                 //auto exp = get_var("f");
+                 //return std::array{throw_error(get_var("message"))};
+                 return std::array{BinaryenUnreachable(mod)};
              });
     add_func("loadfile", {"filename ", "mode", "env"}, false, [this]()
              {

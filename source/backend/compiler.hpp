@@ -4,20 +4,18 @@
 #include <array>
 #include <cassert>
 #include <vector>
-#include <iostream>
 
 #include "ast/ast.hpp"
+#include "func_stack.hpp"
 #include "runtime/runtime.hpp"
 #include "utils/util.hpp"
 #include "wasm.hpp"
 #include "wasm_util.hpp"
-#include "func_stack.hpp"
 
 namespace wumbo
 {
 using namespace ast;
 using namespace wasm;
-
 
 struct compiler : ext_types
 {
@@ -31,7 +29,6 @@ struct compiler : ext_types
 
     runtime& _runtime;
 
-    
     struct help_var_scope
     {
         function_stack& _self;
@@ -115,7 +112,10 @@ struct compiler : ext_types
             for (size_t i = func_offset; i < _self.vars.size(); ++i)
             {
                 if (!_self.vars[i].name.empty())
-                    BinaryenFunctionSetLocalName(func, _self.local_offset(i), _self.vars[i].name.c_str());
+                {
+                    auto name = _self.vars[i].name + std::to_string(i);
+                    BinaryenFunctionSetLocalName(func, _self.local_offset(i), name.c_str());
+                }
             }
         }
 
@@ -153,8 +153,6 @@ struct compiler : ext_types
         switch (var_type)
         {
         case var_type::local:
-
-                std::cout << "get_var\n";
             if (type != upvalue_type())
                 return local_get(index, anyref());
             return BinaryenStructGet(mod, 0, local_get(index, upvalue_type()), anyref(), false);
@@ -174,7 +172,6 @@ struct compiler : ext_types
         switch (var_type)
         {
         case var_type::local:
-                std::cout << "set_var\n";
             if (type != upvalue_type())
                 return local_set(index, value);
             return BinaryenStructSet(mod, 0, local_get(index, upvalue_type()), value);
@@ -445,12 +442,11 @@ struct compiler : ext_types
                 if (var.type != upvalue_type())
                 {
                     expr_ref val = local_get(local_index, anyref());
-                    local_index  = _func_stack.alloc_lua_local(var.name, upvalue_type());
-                    std::cout <<var.name << " " << index << " "<< local_index<<"\n";
+                    local_index  = _func_stack.alloc_lua_local(var.current_name(), upvalue_type());
                     ups.push_back(make_block(std::array{
                         BinaryenStructSet(mod, 0, local_tee(local_index, BinaryenStructNew(mod, nullptr, 0, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()), val),
                         local_get(local_index, upvalue_type()),
-                    }, nullptr, upvalue_type()));
+                    }));
                 }
                 else
                     ups.push_back(local_get(local_index, upvalue_type()));
