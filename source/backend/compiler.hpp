@@ -443,10 +443,8 @@ struct compiler : ext_types
                 {
                     expr_ref val = local_get(local_index, anyref());
                     local_index  = _func_stack.alloc_lua_local(var.current_name(), upvalue_type());
-                    ups.push_back(make_block(std::array{
-                        BinaryenStructSet(mod, 0, local_tee(local_index, BinaryenStructNew(mod, nullptr, 0, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()), val),
-                        local_get(local_index, upvalue_type()),
-                    }));
+                    ups.push_back(
+                        local_tee(local_index, BinaryenStructNew(mod, &val, 1, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()));
                 }
                 else
                     ups.push_back(local_get(local_index, upvalue_type()));
