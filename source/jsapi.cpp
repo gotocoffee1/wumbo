@@ -1,4 +1,5 @@
 #include "ast/ast.hpp"
+#include "ast/analyze.hpp"
 #include "lua2wasm.hpp"
 #include "backend/wasm.hpp"
 
@@ -45,6 +46,7 @@ extern "C"
         {
             ast::block chunk;
             parse_string(std::string_view{str, size}, chunk);
+            ast::analyze{}(chunk);
             res->mod = wumbo::compile(chunk, optimize, standalone);
         }
         catch (const std::exception& e)

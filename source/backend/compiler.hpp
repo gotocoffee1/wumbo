@@ -65,66 +65,6 @@ struct compiler : ext_types
         }
     };
 
-    struct block_scope
-    {
-        function_stack& _self;
-        block_scope(function_stack& self)
-            : _self{self}
-        {
-            _self.push_block();
-        }
-
-        ~block_scope()
-        {
-            _self.pop_block();
-        }
-    };
-
-    struct function_frame
-    {
-        function_stack& _self;
-
-        function_frame(function_stack& self, size_t func_arg_count, std::optional<size_t> vararg_offset = std::nullopt)
-            : _self{self}
-        {
-            _self.push_function(func_arg_count, vararg_offset);
-        }
-
-        ~function_frame()
-        {
-            _self.pop_function();
-        }
-
-        std::vector<BinaryenType> get_local_type_list() const
-        {
-            auto func_offset = _self.functions.back().offset;
-
-            std::vector<BinaryenType> locals;
-            for (size_t i = func_offset; i < _self.vars.size(); ++i)
-                locals.push_back(_self.vars[i].type);
-            return locals;
-        }
-
-        void set_local_names(BinaryenFunctionRef func) const
-        {
-            auto func_offset = _self.functions.back().offset;
-
-            for (size_t i = func_offset; i < _self.vars.size(); ++i)
-            {
-                if (!_self.vars[i].name.empty())
-                {
-                    auto name = _self.vars[i].name + std::to_string(i);
-                    BinaryenFunctionSetLocalName(func, _self.local_offset(i), name.c_str());
-                }
-            }
-        }
-
-        std::vector<size_t> get_requested_upvalues()
-        {
-            return std::move(_self.upvalues.back());
-        }
-    };
-
     function_stack _func_stack;
 
     size_t function_name = 0;
@@ -323,6 +263,7 @@ struct compiler : ext_types
     {
         auto offset                    = _func_stack.local_offset();
         std::string none               = "+none" + std::to_string(label_name++);
+        bool is_upvalue                = true;
         std::vector<const char*> names = {none.c_str()};
         expr_ref_list result;
 
@@ -335,8 +276,23 @@ struct compiler : ext_types
 
         for (auto& arg : p)
         {
-            _func_stack.alloc_lua_local(arg, anyref());
             names.push_back(arg.c_str());
+
+            //local_tee(local_index, BinaryenStructNew(mod, &val, 1, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()));
+
+            if (is_upvalue)
+            {
+                auto index = _func_stack.alloc_lua_local(arg, upvalue_type());
+
+                result.push_back(local_set(index,
+                                           BinaryenStructNew(
+                                               mod,
+                                               nullptr,
+                                               0,
+                                               BinaryenTypeGetHeapType(upvalue_type()))));
+            }
+            else
+                _func_stack.alloc_lua_local(arg, anyref());
         }
 
         const char* vararg = "...";
@@ -394,7 +350,13 @@ struct compiler : ext_types
                 const_i32(j),
                 anyref());
 
-            exp[1] = local_set(j + offset, get);
+            exp[1] = local_set(j + offset,
+                               is_upvalue ? BinaryenStructNew(
+                                                mod,
+                                                &get,
+                                                1,
+                                                BinaryenTypeGetHeapType(upvalue_type()))
+                                          : get);
         }
 
         result.push_back(make_block(exp, names[0]));
@@ -437,17 +399,8 @@ struct compiler : ext_types
         {
             if (_func_stack.is_index_local(index)) // local
             {
-                auto& var        = _func_stack.vars[index];
                 auto local_index = _func_stack.local_offset(index);
-                if (var.type != upvalue_type())
-                {
-                    expr_ref val = local_get(local_index, anyref());
-                    local_index  = _func_stack.alloc_lua_local(var.current_name(), upvalue_type());
-                    ups.push_back(
-                        local_tee(local_index, BinaryenStructNew(mod, &val, 1, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()));
-                }
-                else
-                    ups.push_back(local_get(local_index, upvalue_type()));
+                ups.push_back(local_get(local_index, upvalue_type()));
             }
             else // upvalue
             {

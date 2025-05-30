@@ -1,6 +1,8 @@
 #include "ast/ast.hpp"
-#include "lua2wasm.hpp"
+#include "ast/analyze.hpp"
+#include "ast/printer.hpp"
 #include "backend/wasm.hpp"
+#include "lua2wasm.hpp"
 
 #include <ostream>
 #include <string_view>
@@ -65,6 +67,7 @@ int main(int argc, char** argv)
             p(chunk);
         }
 
+        ast::analyze{}(chunk);
         wasm::mod result = (mode == export_mode::runtime) ? wumbo::make_runtime(optimize) : wumbo::compile(chunk, optimize, mode == export_mode::standalone);
         {
             std::ofstream ofstream;

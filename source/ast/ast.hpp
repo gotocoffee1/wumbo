@@ -10,6 +10,14 @@
 namespace wumbo::ast
 {
 
+struct local_usage
+{
+    size_t write_count = 0;
+    size_t read_count  = 0;
+    bool init          = false;
+    bool upvalue       = false;
+};
+
 using name_t    = std::string;
 using name_list = std::vector<name_t>;
 
@@ -50,6 +58,7 @@ struct function_body
     block inner;
     name_list params; // size >=0
     bool vararg = false;
+    std::vector<local_usage> usage;
 };
 
 struct function_definition
@@ -62,6 +71,7 @@ struct local_function
 {
     function_body body;
     name_t name;
+    local_usage usage;
 };
 
 struct bin_operation;
@@ -250,6 +260,7 @@ struct local_variables
 {
     expression_list explist; // size >=0
     name_list names;         // size >=1
+    std::vector<local_usage> usage;
 };
 
 struct field
@@ -277,312 +288,5 @@ struct statement
         local_function,
         local_variables>
         inner;
-};
-} // namespace ast
-
-#include "utils/util.hpp"
-#include <ostream>
-#include <string_view>
-
-namespace wumbo::ast
-{
-struct printer
-{
-    std::ostream& out;
-
-    std::size_t _indent = 0;
-
-    static constexpr std::size_t per_indentation = 4;
-
-    struct guard
-    {
-        printer& p;
-
-        ~guard()
-        {
-            p._indent--;
-        }
-    };
-
-    void print(std::string_view name)
-    {
-        out << std::string(_indent * per_indentation, ' ') << name << "\n";
-    }
-
-    guard print_indent(std::string_view name)
-    {
-        print(name);
-        _indent++;
-        return guard{*this};
-    }
-
-    void _functail(const functail& f)
-    {
-        (*this)(f.args);
-        //(*this)(f.name);
-    }
-
-    void _vartail(const vartail& v)
-    {
-        std::visit(overload{
-                       [&](const expression& exp)
-                       {
-                           (*this)(exp);
-                       },
-                       [&](const name_t& name)
-                       {
-                           print(name);
-                       },
-                   },
-                   v);
-    }
-
-    void _varhead(const varhead& v)
-    {
-        std::visit(overload{
-                       [&](const std::pair<expression, vartail>& exp)
-                       {
-                           (*this)(exp.first);
-                           _vartail(exp.second);
-                       },
-                       [&](const name_t& name)
-                       {
-                           print(name);
-                       },
-                   },
-                   v);
-    }
-
-    void _funchead(const funchead& v)
-    {
-        std::visit(overload{
-                       [&](const expression& exp)
-                       {
-                           (*this)(exp);
-                       },
-                       [&](const name_t& name)
-                       {
-                           print(name);
-                       },
-                   },
-                   v);
-    }
-
-    void operator()(const assignments& p)
-    {
-        auto g = print_indent("assignments");
-        for (auto& var : p.varlist)
-        {
-            _varhead(var.head);
-            for (auto& [func, var] : var.tail)
-            {
-                for (auto& f : func)
-                    _functail(f);
-                _vartail(var);
-            }
-        }
-
-        (*this)(p.explist);
-    }
-
-    void operator()(const function_call& p)
-    {
-        auto g = print_indent("function_call");
-
-        _funchead(p.head);
-
-        for (auto& [var, func] : p.tail)
-        {
-            for (auto& v : var)
-                _vartail(v);
-            _functail(func);
-        }
-    }
-
-    void operator()(const prefixexp& p)
-    {
-        auto g = print_indent("prefixexp");
-
-        _funchead(p.chead);
-
-        for (auto& t : p.tail)
-        {
-            std::visit(overload{
-                           [&](const functail& f)
-                           {
-                               _functail(f);
-                           },
-                           [&](const vartail& v)
-                           {
-                               _vartail(v);
-                           },
-                       },
-                       t);
-        }
-    }
-
-    void operator()(const label_statement& p)
-    {
-        print("label_statement");
-    }
-    void operator()(const key_break& p)
-    {
-        print("key_break");
-    }
-    void operator()(const goto_statement& p)
-    {
-        print("goto_statement");
-    }
-    void operator()(const do_statement& p)
-    {
-        auto g = print_indent("do_statement");
-    }
-    void operator()(const while_statement& p)
-    {
-        auto g = print_indent("while_statement");
-    }
-    void operator()(const repeat_statement& p)
-    {
-        auto g = print_indent("repeat_statement");
-    }
-    void operator()(const if_statement& p)
-    {
-        auto g = print_indent("if_statement");
-    }
-    void operator()(const for_statement& p)
-    {
-        auto g = print_indent("for_statement");
-    }
-    void operator()(const for_each& p)
-    {
-        auto g = print_indent("for_each");
-    }
-    void operator()(const function_definition& p)
-    {
-        auto g = print_indent("function_definition");
-
-        (*this)(p.body);
-    }
-    void operator()(const local_function& p)
-    {
-        auto g = print_indent("local_function");
-    }
-    void operator()(const local_variables& p)
-    {
-        auto g = print_indent("local_variables");
-        (*this)(p.names);
-        (*this)(p.explist);
-    }
-
-    void operator()(const expression& p)
-    {
-        std::visit(*this, p.inner);
-    }
-
-    void operator()(const expression_list& p)
-    {
-        for (auto& exp : p)
-        {
-            (*this)(exp);
-        }
-    }
-
-    void operator()(const nil& p)
-    {
-        print("nil");
-    }
-    void operator()(const boolean& p)
-    {
-        print(p.value ? "true" : "false");
-    }
-    void operator()(const int_type& p)
-    {
-        print(std::to_string(p));
-    }
-    void operator()(const float_type& p)
-    {
-        print(std::to_string(p));
-    }
-    void operator()(const literal& p)
-    {
-        print("\"" + p.str + "\"");
-    }
-    void operator()(const ellipsis& p)
-    {
-        print("...");
-    }
-    void operator()(const function_body& p)
-    {
-        auto g = print_indent("function_body");
-        (*this)(p.params);
-        if (p.vararg)
-            print("...");
-
-        (*this)(p.inner);
-    }
-
-    void operator()(const table_constructor& p)
-    {
-        auto g = print_indent("table_constructor");
-        for (auto& field : p)
-        {
-            auto g = print_indent("field");
-            std::visit(overload{
-                           [](const std::monostate&)
-                           {
-                               // array
-                           },
-                           [&](const expression& exp)
-                           {
-                               (*this)(exp);
-                           },
-                           [&](const name_t& name)
-                           {
-                               print(name);
-                           },
-                       },
-                       field.index);
-            (*this)(field.value);
-        }
-    }
-    void operator()(const bin_operation& p)
-    {
-        auto g = print_indent("bin_operation");
-        (*this)(p.lhs);
-        (*this)(p.rhs);
-    }
-    void operator()(const un_operation& p)
-    {
-        auto g = print_indent("un_operation");
-        (*this)(p.rhs);
-    }
-
-    template<typename T>
-    void operator()(const box<T>& p)
-    {
-        (*this)(*p);
-    }
-
-    void operator()(const name_list& p)
-    {
-        for (auto& n : p)
-        {
-            print(n);
-        }
-    }
-
-    void operator()(const block& p)
-    {
-        auto g = print_indent("block");
-        for (auto& statement : p.statements)
-        {
-            std::visit(*this, statement.inner);
-        }
-        if (p.retstat)
-        {
-            print("return");
-            (*this)(*p.retstat);
-        }
-    }
 };
 } // namespace ast

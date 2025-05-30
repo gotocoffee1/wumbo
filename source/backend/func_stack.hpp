@@ -1,10 +1,10 @@
 #pragma once
 
-#include <binaryen-c.h>
-#include <string>
-#include <optional>
-#include <vector>
 #include <algorithm>
+#include <binaryen-c.h>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace wumbo
 {
@@ -15,6 +15,9 @@ enum class var_type
     upvalue,
     global,
 };
+
+using local_index_t  = size_t;
+using global_index_t = size_t;
 
 struct local_var
 {
@@ -105,18 +108,19 @@ struct function_stack
         upvalues.pop_back();
     }
 
-    size_t local_offset(size_t index) const
+    local_index_t local_offset(global_index_t index) const
     {
+        assert(is_index_local(index) && "invalid index");
         auto& func = functions.back();
         return func.arg_count + (index - func.offset);
     }
 
-    size_t local_offset() const
+    local_index_t local_offset() const
     {
         return local_offset(vars.size());
     }
 
-    bool is_index_local(size_t index) const
+    bool is_index_local(global_index_t index) const
     {
         auto func_offset = functions.back().offset;
         return index >= func_offset;
@@ -129,7 +133,7 @@ struct function_stack
         vars[(pos - func.arg_count) + func.offset].flags &= ~local_var::is_used;
     }
 
-    size_t alloc_local(BinaryenType type, std::string_view name = "", bool helper = true)
+    local_index_t alloc_local(BinaryenType type, std::string_view name = "", bool helper = true)
     {
         auto func_offset = functions.back().offset;
 
@@ -160,7 +164,7 @@ struct function_stack
         return local_offset(vars.size() - 1);
     }
 
-    size_t alloc_lua_local(std::string_view name, BinaryenType type)
+    local_index_t alloc_lua_local(std::string_view name, BinaryenType type)
     {
         return alloc_local(type, name, false);
     }
@@ -182,4 +186,65 @@ struct function_stack
         return {var_type::global, 0, BinaryenTypeNone()}; // global
     }
 };
+
+struct block_scope
+{
+    function_stack& _self;
+    block_scope(function_stack& self)
+        : _self{self}
+    {
+        _self.push_block();
+    }
+
+    ~block_scope()
+    {
+        _self.pop_block();
+    }
+};
+
+struct function_frame
+{
+    function_stack& _self;
+
+    function_frame(function_stack& self, size_t func_arg_count, std::optional<size_t> vararg_offset = std::nullopt)
+        : _self{self}
+    {
+        _self.push_function(func_arg_count, vararg_offset);
+    }
+
+    ~function_frame()
+    {
+        _self.pop_function();
+    }
+
+    std::vector<BinaryenType> get_local_type_list() const
+    {
+        auto func_offset = _self.functions.back().offset;
+
+        std::vector<BinaryenType> locals;
+        for (size_t i = func_offset; i < _self.vars.size(); ++i)
+            locals.push_back(_self.vars[i].type);
+        return locals;
+    }
+
+    void set_local_names(BinaryenFunctionRef func) const
+    {
+        auto func_offset = _self.functions.back().offset;
+
+        for (size_t i = func_offset; i < _self.vars.size(); ++i)
+        {
+            if (!_self.vars[i].name.empty())
+            {
+                auto name = _self.vars[i].name + std::to_string(i);
+                BinaryenFunctionSetLocalName(func, _self.local_offset(i), name.c_str());
+            }
+        }
+    }
+
+    std::vector<size_t> get_requested_upvalues()
+    {
+        return std::move(_self.upvalues.back());
+    }
+};
+
 } // namespace wumbo
