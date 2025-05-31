@@ -297,7 +297,7 @@ struct analyze
             usage->write_count++;
             break;
         case var_type::global:
-            get_var("_ENV");
+            //get_var("_ENV");
             break;
         default:
             break;
@@ -316,8 +316,8 @@ struct analyze
             usage->read_count++;
             break;
         case var_type::global:
-            assert(name != "_ENV" && "no environment set");
-            get_var("_ENV");
+            //assert(name != "_ENV" && "no environment set");
+            //get_var("_ENV");
             break;
         default:
             break;

@@ -5,15 +5,14 @@ namespace wumbo
 
 expr_ref_list compiler::operator()(const local_function& p)
 {
-    bool is_upvalue = p.usage.upvalue && p.usage.write_count > 0;
+    bool is_upvalue = true;p.usage.upvalue && p.usage.write_count > 0;
 
     auto index = _func_stack.alloc_lua_local(p.name, is_upvalue ? upvalue_type() : anyref());
 
     auto func = add_func_ref(p.name.c_str(), p.body);
 
     if (is_upvalue)
-
-        return {BinaryenStructSet(mod, 0, local_tee(index, BinaryenStructNew(mod, nullptr, 0, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()), func)};
+        return {local_set(index, BinaryenStructNew(mod, &func, 1, BinaryenTypeGetHeapType(upvalue_type())))};
 
     return {local_set(index, func)};
 }
