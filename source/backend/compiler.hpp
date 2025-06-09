@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <nonstd/span.hpp>
 #include <vector>
 
 #include "ast/ast.hpp"
@@ -83,8 +84,9 @@ struct compiler : ext_types
             result = up.size();
             up.push_back(index);
         }
-        auto exp = local_get(upvalue_index, upvalue_array_type());
-        return array_get(exp, const_i32(result), upvalue_type());
+        auto exp = local_get(upvalue_index, ref_array_type());
+        return array_get(exp, const_i32(result), anyref());
+        //return array_get(exp, const_i32(result), upvalue_type());
     }
 
     expr_ref get_var(const name_t& name)
@@ -97,7 +99,9 @@ struct compiler : ext_types
                 return local_get(index, anyref());
             return BinaryenStructGet(mod, 0, local_get(index, upvalue_type()), anyref(), false);
         case var_type::upvalue:
-            return BinaryenStructGet(mod, 0, get_upvalue(index), anyref(), false);
+            if (type != upvalue_type())
+                return get_upvalue(index);
+            return BinaryenStructGet(mod, 0, BinaryenRefCast(mod, get_upvalue(index), upvalue_type()), anyref(), false);
         case var_type::global:
             assert(name != "_ENV" && "no environment set");
             return table_get(get_var("_ENV"), add_string(name));
@@ -116,7 +120,8 @@ struct compiler : ext_types
                 return local_set(index, value);
             return BinaryenStructSet(mod, 0, local_get(index, upvalue_type()), value);
         case var_type::upvalue:
-            return BinaryenStructSet(mod, 0, get_upvalue(index), value);
+            assert(type == upvalue_type() && "must be upvalue");
+            return BinaryenStructSet(mod, 0, BinaryenRefCast(mod, get_upvalue(index), upvalue_type()), value);
         case var_type::global:
             return table_set(get_var("_ENV"), add_string(name), value);
         default:
@@ -259,11 +264,10 @@ struct compiler : ext_types
         semantic_error("cannot use '...' outside a vararg function near '...'");
     }
 
-    expr_ref_list unpack_locals(const name_list& p, expr_ref list, bool is_vararg = false)
+    expr_ref_list unpack_locals(const name_list& p, expr_ref list, nonstd::span<const local_usage> usage, bool is_vararg = false)
     {
         auto offset                    = _func_stack.local_offset();
         std::string none               = "+none" + std::to_string(label_name++);
-        bool is_upvalue                = true;
         std::vector<const char*> names = {none.c_str()};
         expr_ref_list result;
 
@@ -273,14 +277,14 @@ struct compiler : ext_types
                 _func_stack.functions.back().vararg_offset = args_index;
             return result;
         }
-
+        size_t i = 0;
         for (auto& arg : p)
         {
             names.push_back(arg.c_str());
 
             //local_tee(local_index, BinaryenStructNew(mod, &val, 1, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()));
 
-            if (is_upvalue)
+            if (usage[i++].is_upvalue())
             {
                 auto index = _func_stack.alloc_lua_local(arg, upvalue_type());
 
@@ -351,12 +355,12 @@ struct compiler : ext_types
                 anyref());
 
             exp[1] = local_set(j + offset,
-                               is_upvalue ? BinaryenStructNew(
-                                                mod,
-                                                &get,
-                                                1,
-                                                BinaryenTypeGetHeapType(upvalue_type()))
-                                          : get);
+                               usage[j].is_upvalue() ? BinaryenStructNew(
+                                                           mod,
+                                                           &get,
+                                                           1,
+                                                           BinaryenTypeGetHeapType(upvalue_type()))
+                                                     : get);
         }
 
         result.push_back(make_block(exp, names[0]));
@@ -364,11 +368,11 @@ struct compiler : ext_types
     }
 
     template<typename F>
-    auto add_func(const char* name, const name_list& p, bool vararg, F&& f)
+    auto add_func(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
     {
         function_frame frame{_func_stack, func_arg_count};
 
-        expr_ref_list body = unpack_locals(p, local_get(args_index, ref_array_type()), vararg);
+        expr_ref_list body = unpack_locals(p, local_get(args_index, ref_array_type()), usage, vararg);
 
         append(body, f());
 
@@ -411,24 +415,24 @@ struct compiler : ext_types
     }
 
     template<typename F>
-    auto add_func_ref(const char* name, const name_list& p, bool vararg, F&& f)
+    auto add_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
     {
-        auto [func, req_ups] = add_func(name, p, vararg, f);
+        auto [func, req_ups] = add_func(name, p, usage, vararg, f);
 
         auto ups = gather_upvalues(req_ups);
 
         auto sig       = BinaryenTypeFromHeapType(BinaryenFunctionGetType(func), false);
         expr_ref exp[] = {
             BinaryenRefFunc(mod, name, sig),
-            ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(upvalue_array_type()), std::data(ups), std::size(ups)),
+            ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups)),
         };
         return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_type::function>()));
     }
 
-    auto add_func_ref(const char* name, const block& inner, const name_list& p, bool vararg)
+    auto add_func_ref(const char* name, const block& inner, const name_list& p, nonstd::span<const local_usage> usage, bool vararg)
     {
         return add_func_ref(
-            name, p, vararg, [&]()
+            name, p, usage, vararg, [&]()
             {
                 return (*this)(inner);
             });
@@ -436,7 +440,7 @@ struct compiler : ext_types
 
     auto add_func_ref(const char* name, const function_body& p) -> expr_ref
     {
-        return add_func_ref(name, p.inner, p.params, p.vararg);
+        return add_func_ref(name, p.inner, p.params, p.usage, p.vararg);
     }
 
     auto operator()(const function_body& p)
@@ -497,7 +501,7 @@ struct compiler : ext_types
 
         append(env, open_basic_lib());
 
-        auto start = add_func_ref("*init", chunk, {}, true);
+        auto start = add_func_ref("*init", chunk, {}, {}, true);
 
         env.push_back(BinaryenDrop(mod, call(start, null())));
 

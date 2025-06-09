@@ -5,7 +5,7 @@ namespace wumbo
 
 expr_ref_list compiler::operator()(const local_function& p)
 {
-    bool is_upvalue = true;p.usage.upvalue && p.usage.write_count > 0;
+    bool is_upvalue = p.usage.is_upvalue();
 
     auto index = _func_stack.alloc_lua_local(p.name, is_upvalue ? upvalue_type() : anyref());
 
@@ -22,7 +22,7 @@ expr_ref_list compiler::operator()(const local_variables& p)
     auto explist = (*this)(p.explist);
     auto local   = help_var_scope{_func_stack, ref_array_type()};
 
-    auto res = unpack_locals(p.names, local_get(local, ref_array_type()));
+    auto res = unpack_locals(p.names, local_get(local, ref_array_type()), p.usage);
     res.insert(res.begin(), local_set(local, explist));
 
     return res;

@@ -503,7 +503,7 @@ struct ext_types : utils
             {
                 "lua_function",
                 sig_def{
-                    {upvalue_array, ref_array},
+                    {ref_array, ref_array},
                     {ref_array},
                 },
             },
@@ -542,7 +542,7 @@ struct ext_types : utils
             {
                 "function",
                 struct_def{
-                    {lua_function, upvalue_array},
+                    {lua_function, ref_array},
                     {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
                     {false, false},
                     {"function_ref", "upvalues"},

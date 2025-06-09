@@ -16,6 +16,11 @@ struct local_usage
     size_t read_count  = 0;
     bool init          = false;
     bool upvalue       = false;
+
+    bool is_upvalue() const
+    {
+        return upvalue && write_count > 0;
+    }
 };
 
 using name_t    = std::string;

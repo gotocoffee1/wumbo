@@ -1,3 +1,4 @@
+#include "ast/ast.hpp"
 #include "compiler.hpp"
 #include "runtime/runtime.hpp"
 #include <array>
@@ -13,7 +14,9 @@ expr_ref_list compiler::open_basic_lib()
 
     auto add_func = [&](const char* name, const name_list& args, bool vararg, auto&& f)
     {
-        result.push_back(set_var(name, add_func_ref(name, args, vararg, f)));
+        std::vector<local_usage> usage;
+        usage.resize(args.size());
+        result.push_back(set_var(name, add_func_ref(name, args, usage, vararg, f)));
     };
 
     add_func("assert", {"v", "message"}, false, [this]()
