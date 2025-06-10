@@ -67,7 +67,7 @@ int main(int argc, char** argv)
             p(chunk);
         }
 
-        ast::analyze{}(chunk);
+        ast::analyzer{}(chunk);
         wasm::mod result = (mode == export_mode::runtime) ? wumbo::make_runtime(optimize) : wumbo::compile(chunk, optimize, mode == export_mode::standalone);
         {
             std::ofstream ofstream;

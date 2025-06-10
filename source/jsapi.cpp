@@ -46,7 +46,7 @@ extern "C"
         {
             ast::block chunk;
             parse_string(std::string_view{str, size}, chunk);
-            ast::analyze{}(chunk);
+            ast::analyzer{}(chunk);
             res->mod = wumbo::compile(chunk, optimize, standalone);
         }
         catch (const std::exception& e)

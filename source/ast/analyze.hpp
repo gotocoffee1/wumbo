@@ -6,9 +6,17 @@
 
 namespace wumbo::ast
 {
-struct analyze
+struct analyzer
 {
     function_stack _func_stack;
+
+    local_usage env_usage;
+
+    analyzer()
+    {
+        _func_stack.alloc_local("_ENV", env_usage);
+    }
+
 
     void _functail(functail& f)
     {
@@ -263,7 +271,7 @@ struct analyze
     template<typename T>
     void operator()(box<T>& p)
     {
-        visit(*p);
+        (*this)(*p);
     }
 
     template<typename T>
@@ -297,7 +305,7 @@ struct analyze
             usage->write_count++;
             break;
         case var_type::global:
-            //get_var("_ENV");
+            get_var("_ENV");
             break;
         default:
             break;
@@ -316,8 +324,8 @@ struct analyze
             usage->read_count++;
             break;
         case var_type::global:
-            //assert(name != "_ENV" && "no environment set");
-            //get_var("_ENV");
+            assert(name != "_ENV" && "no environment set");
+            get_var("_ENV");
             break;
         default:
             break;

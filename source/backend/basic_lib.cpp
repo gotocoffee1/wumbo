@@ -43,11 +43,38 @@ expr_ref_list compiler::open_basic_lib()
              {
                  return std::array{BinaryenUnreachable(mod)};
              });
-    add_func("load", {"chunk", "chunkname", "mode", "env"}, true, [this]()
+    add_func("load", {"chunk", "chunkname", "mode", "env"}, false, [this]()
              {
-                 //auto exp = get_var("f");
-                 //return std::array{throw_error(get_var("message"))};
-                 return std::array{BinaryenUnreachable(mod)};
+                 auto chunk = get_var("chunk");
+
+                 auto casts = std::array{
+                     value_type::string,
+                     value_type::function,
+                 };
+
+                 return switch_value(chunk, casts, [&](value_type type, expr_ref exp)
+                                     {
+                                         const char* str;
+                                         switch (type)
+                                         {
+                                         case value_type::string:
+                                             str = "string";
+                                             break;
+                                         case value_type::function:
+                                             str = "function";
+                                             break;
+
+                                         default:
+                                             return BinaryenUnreachable(mod);
+                                         }
+
+                                         auto ret = make_return(make_ref_array(add_string(str)));
+                                         return exp ? make_block(std::array{
+                                                          drop(exp),
+                                                          ret,
+                                                      })
+                                                    : ret;
+                                     });
              });
     add_func("loadfile", {"filename ", "mode", "env"}, false, [this]()
              {
@@ -108,7 +135,7 @@ expr_ref_list compiler::open_basic_lib()
                  exp = _runtime.call(functions::lua_str_to_js_array, exp);
 
                  return std::array{
-                     make_call("stdout", exp, BinaryenTypeNone()), 
+                     make_call("stdout", exp, BinaryenTypeNone()),
                      make_call("stdout", _runtime.call(functions::lua_str_to_js_array, add_string("\n")), BinaryenTypeNone()),
                      make_return(null()),
                  };
@@ -214,6 +241,9 @@ expr_ref_list compiler::setup_env()
     local_variables vars;
     vars.names.push_back("_ENV");
     vars.explist.emplace_back().inner = table_constructor{};
+    auto& usage                       = vars.usage.emplace_back();
+    usage.upvalue                     = true;
+    usage.write_count                 = 1;
 
     return (*this)(vars);
 
