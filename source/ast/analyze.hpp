@@ -17,7 +17,6 @@ struct analyzer
         _func_stack.alloc_local("_ENV", env_usage);
     }
 
-
     void _functail(functail& f)
     {
         visit(f.args);
@@ -103,18 +102,26 @@ struct analyzer
 
     void visit(assignments& p)
     {
+        visit(p.explist);
         for (auto& var : p.varlist)
         {
-            _varhead(var.head);
-            for (auto& [func, var] : var.tail)
+            if (var.tail.empty())
+                _varhead_set(var.head);
+            else
             {
-                for (auto& f : func)
-                    _functail(f);
-                _vartail(var);
+                _varhead(var.head);
+                for (auto& [func, vartail] : var.tail)
+                {
+                    for (auto& f : func)
+                        _functail(f);
+
+                    if (&vartail == &var.tail.back().second)
+                        _vartail_set(vartail);
+                    else
+                        _vartail(vartail);
+                }
             }
         }
-
-        visit(p.explist);
     }
 
     void visit(function_call& p)
@@ -160,25 +167,47 @@ struct analyzer
     }
     void visit(do_statement& p)
     {
+        visit(p.inner);
     }
     void visit(while_statement& p)
     {
+        visit(p.condition);
+        visit(p.inner);
     }
     void visit(repeat_statement& p)
     {
+        visit(p.inner);
+        visit(p.condition);
     }
     void visit(if_statement& p)
     {
+        for (auto& [cond_exp, body] : p.cond_block)
+        {
+            visit(cond_exp);
+            visit(body);
+        }
+        if (p.else_block)
+            visit(*p.else_block);
     }
+
+    // TODO
     void visit(for_statement& p)
     {
+        visit(p.inner);
     }
     void visit(for_each& p)
     {
+        visit(p.inner);
     }
     void visit(function_definition& p)
     {
         visit(p.body);
+        if (p.function_name.size() == 1)
+            set_var(p.function_name.front());
+        else
+        {
+            get_var(p.function_name.front());
+        }
     }
     void visit(local_function& p)
     {
@@ -238,24 +267,28 @@ struct analyzer
 
     void visit(table_constructor& p)
     {
+        expression_list array_init;
+
         for (auto& field : p)
         {
             std::visit(overload{
-                           [](std::monostate&)
+                           [&](std::monostate&)
                            {
-                               // array
+                               array_init.push_back(field.value);
                            },
-                           [&](expression& exp)
+                           [&](expression& index)
                            {
-                               visit(exp);
+                               visit(index);
+                               visit(field.value);
                            },
-                           [&](name_t& name) {
-
+                           [&](name_t& name)
+                           {
+                               visit(field.value);
                            },
                        },
                        field.index);
-            visit(field.value);
         }
+        visit(array_init);
     }
     void visit(bin_operation& p)
     {
