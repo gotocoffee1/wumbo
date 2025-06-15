@@ -57,7 +57,6 @@ expr_ref_list compiler::open_basic_lib()
 
                  return switch_value(chunk, casts, [this](value_type type, expr_ref exp)
                                      {
-                                         const char* str;
                                          switch (type)
                                          {
                                          case value_type::string:
@@ -69,9 +68,7 @@ expr_ref_list compiler::open_basic_lib()
                                          default:
                                              return BinaryenUnreachable(mod);
                                          }
-
-                                         auto ret = make_return(null());
-                                         return exp ? make_return(make_ref_array(exp)) : ret;
+                                         return exp ? make_return(make_ref_array(exp)) : make_return(null());
                                      });
              });
     add_func("loadfile", {"filename ", "mode", "env"}, false, [this]()
@@ -241,6 +238,7 @@ expr_ref_list compiler::setup_env()
     vars.explist.emplace_back().inner = table_constructor{};
     auto& usage                       = vars.usage.emplace_back();
     usage.upvalue                     = true;
+    usage.read_count                  = 1;
     usage.write_count                 = 1;
 
     return (*this)(vars);

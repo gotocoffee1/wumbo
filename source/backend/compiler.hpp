@@ -404,7 +404,7 @@ struct compiler : ext_types
             if (_func_stack.is_index_local(index)) // local
             {
                 auto local_index = _func_stack.local_offset(index);
-                ups.push_back(local_get(local_index, upvalue_type()));
+                ups.push_back(local_get(local_index, _func_stack.vars[index].type));
             }
             else // upvalue
             {
