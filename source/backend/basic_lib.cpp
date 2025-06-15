@@ -239,7 +239,7 @@ expr_ref_list compiler::setup_env()
     auto& usage                       = vars.usage.emplace_back();
     usage.upvalue                     = true;
     usage.read_count                  = 1;
-    usage.write_count                 = 1;
+    usage.write_count                 = 0;
 
     return (*this)(vars);
 
