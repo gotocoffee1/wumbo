@@ -1,0 +1,4 @@
+#!/bin/sh
+
+node --experimental-wasm-jspi index.mjs "$@"
+

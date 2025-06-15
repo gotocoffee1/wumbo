@@ -6,12 +6,16 @@ const instantiateBuffer = async (buffer, importObject) => {
   return instance.exports;
 };
 
-const makeImportObject = (override) => {
+const makeImportObject = (override, load_func) => {
   const bufToStr = (buf) => new TextDecoder().decode(buf);
   const strToBuf = (str) => new TextEncoder().encode(str);
   const importObject = {
     load: {
-      load: instantiateBuffer,
+      load: new WebAssembly.Suspending(load_func),
+      /*execute: new WebAssembly.Suspending(async (f) => {
+        console.log(await f);
+        (await f)();
+      }),*/
     },
     native: {
       stdout: (str) => console.log(bufToStr(str)),
@@ -71,18 +75,17 @@ const convertResult = async (result, format, importObject) => {
   }
 };
 
-const runtime = async (optimize, format, importObject) => {
-  return await convertResult(generate_runtime(optimize), format, importObject);
+const runtime = (optimize, format, importObject) => {
+  return convertResult(generate_runtime(optimize), format, importObject);
 };
 
-const load = async (txt, importObject, optimize, format, standalone) => {
-  const bytes = new TextEncoder().encode(txt);
+const load = async (bytes, importObject, optimize, format, standalone) => {
   const [exports, wat] = await convertResult(
     load_lua(bytes, bytes.length, optimize, standalone),
     format,
     importObject,
   );
-  return [exports.start, wat];
+  return [exports, wat];
 };
 
 export const newInstance = async ({
@@ -91,13 +94,22 @@ export const newInstance = async ({
   format = undefined,
   standalone = false,
 } = {}) => {
-  const importObject = makeImportObject(override);
+  const load_func = (bytes) =>
+    load(bytes, importObject, optimize, format, standalone);
+
+  const importObject = makeImportObject(
+    override,
+    async (bytes) => (await load_func(bytes))[0].init,
+  );
   if (!standalone) {
     const [exports, wat] = await runtime(optimize, format, importObject);
     importObject.runtime = exports;
   }
 
   return async (txt) => {
-    return await load(txt, importObject, optimize, format, standalone);
+    const bytes = new TextEncoder().encode(txt);
+    const [exports, wat] = await load_func(bytes);
+
+    return [WebAssembly.promising(exports.init_env), wat];
   };
 };

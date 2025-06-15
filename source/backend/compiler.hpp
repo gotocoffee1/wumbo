@@ -414,6 +414,15 @@ struct compiler : ext_types
         return ups;
     }
 
+    auto build_closure(expr_ref func_ref, expr_ref_list ups)
+    {
+        expr_ref exp[] = {
+            func_ref,
+            ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups)),
+        };
+        return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_type::function>()));
+    }
+
     template<typename F>
     auto add_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
     {
@@ -422,11 +431,7 @@ struct compiler : ext_types
         auto ups = gather_upvalues(req_ups);
 
         auto sig       = BinaryenTypeFromHeapType(BinaryenFunctionGetType(func), false);
-        expr_ref exp[] = {
-            BinaryenRefFunc(mod, name, sig),
-            ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups)),
-        };
-        return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_type::function>()));
+        return build_closure(BinaryenRefFunc(mod, name, sig), std::move(ups));
     }
 
     auto add_func_ref(const char* name, const block& inner, const name_list& p, nonstd::span<const local_usage> usage, bool vararg)
@@ -502,6 +507,7 @@ struct compiler : ext_types
         append(env, open_basic_lib());
 
         auto start = add_func_ref("*init", chunk, {}, {}, true);
+        BinaryenAddFunctionExport(mod, "*init", "init");
 
         env.push_back(BinaryenDrop(mod, call(start, null())));
 
@@ -524,14 +530,14 @@ struct compiler : ext_types
 
         auto locals = frame.get_local_type_list();
         BinaryenAddFunction(mod,
-                            "*invoke_lua",
+                            "*init_env",
                             BinaryenTypeNone(),
                             BinaryenTypeNone(),
                             std::data(locals),
                             std::size(locals),
                             try_);
 
-        BinaryenAddFunctionExport(mod, "*invoke_lua", "start");
+        BinaryenAddFunctionExport(mod, "*init_env", "init_env");
     }
 };
 } // namespace wumbo

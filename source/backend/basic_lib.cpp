@@ -1,4 +1,6 @@
 #include "ast/ast.hpp"
+#include "backend/wasm_util.hpp"
+#include "binaryen-c.h"
 #include "compiler.hpp"
 #include "runtime/runtime.hpp"
 #include <array>
@@ -9,6 +11,7 @@ namespace wumbo
 expr_ref_list compiler::open_basic_lib()
 {
     BinaryenAddFunctionImport(mod, "stdout", "native", "stdout", BinaryenTypeExternref(), BinaryenTypeNone());
+    BinaryenAddFunctionImport(mod, "load_lua", "load", "load", BinaryenTypeExternref(), lua_func());
 
     expr_ref_list result;
 
@@ -43,37 +46,32 @@ expr_ref_list compiler::open_basic_lib()
              {
                  return std::array{BinaryenUnreachable(mod)};
              });
-    add_func("load", {"chunk", "chunkname", "mode", "env"}, false, [this]()
+    add_func("load", {"chunk", "chunkname", "mode", "env"}, false, [&]()
              {
                  auto chunk = get_var("chunk");
 
                  auto casts = std::array{
                      value_type::string,
-                     value_type::function,
+                     //value_type::function,
                  };
 
-                 return switch_value(chunk, casts, [&](value_type type, expr_ref exp)
+                 return switch_value(chunk, casts, [this](value_type type, expr_ref exp)
                                      {
                                          const char* str;
                                          switch (type)
                                          {
                                          case value_type::string:
-                                             str = "string";
+                                             exp = _runtime.call(functions::lua_str_to_js_array, exp);
+                                             exp = make_call("load_lua", exp, lua_func());
+                                             exp = build_closure(exp, {get_var("_ENV")});
                                              break;
                                          case value_type::function:
-                                             str = "function";
-                                             break;
-
                                          default:
                                              return BinaryenUnreachable(mod);
                                          }
 
-                                         auto ret = make_return(make_ref_array(add_string(str)));
-                                         return exp ? make_block(std::array{
-                                                          drop(exp),
-                                                          ret,
-                                                      })
-                                                    : ret;
+                                         auto ret = make_return(null());
+                                         return exp ? make_return(make_ref_array(exp)) : ret;
                                      });
              });
     add_func("loadfile", {"filename ", "mode", "env"}, false, [this]()
