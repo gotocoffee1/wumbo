@@ -11,11 +11,9 @@ const makeImportObject = (override, load_func) => {
   const strToBuf = (str) => new TextEncoder().encode(str);
   const importObject = {
     load: {
-      load: new WebAssembly.Suspending(load_func),
-      /*execute: new WebAssembly.Suspending(async (f) => {
-        console.log(await f);
-        (await f)();
-      }),*/
+      load: WebAssembly.Suspending
+        ? new WebAssembly.Suspending(load_func)
+        : () => {},
     },
     native: {
       stdout: (str) => console.log(bufToStr(str)),
@@ -110,6 +108,11 @@ export const newInstance = async ({
     const bytes = new TextEncoder().encode(txt);
     const [exports, wat] = await load_func(bytes);
 
-    return [WebAssembly.promising(exports.init_env), wat];
+    return [
+      WebAssembly.promising
+        ? WebAssembly.promising(exports.init_env)
+        : exports.init_env,
+      wat,
+    ];
   };
 };

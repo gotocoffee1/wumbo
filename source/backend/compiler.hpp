@@ -138,15 +138,24 @@ struct compiler : ext_types
     expr_ref _varhead(const varhead& v);
 
     expr_ref _varhead_set(const varhead& v, expr_ref value);
+
+    template<typename F>
+    expr_ref at_or_null(size_t array, size_t index, expr_ref value, F&& f)
+    {
+        return make_if(BinaryenRefIsNull(mod, value ? local_tee(array, value, ref_array_type()) : local_get(array, ref_array_type())),
+                       f(),
+                       BinaryenIf(mod,
+                                  BinaryenBinary(mod, BinaryenGtUInt32(), BinaryenArrayLen(mod, local_get(array, ref_array_type())), const_i32(index)),
+                                  BinaryenArrayGet(mod, local_get(array, ref_array_type()), const_i32(index), anyref(), false),
+                                  f()));
+    }
+
     expr_ref at_or_null(size_t array, size_t index, expr_ref value = nullptr)
     {
-        return BinaryenIf(mod,
-                          BinaryenRefIsNull(mod, value ? local_tee(array, value, ref_array_type()) : local_get(array, ref_array_type())),
-                          null(),
-                          BinaryenIf(mod,
-                                     BinaryenBinary(mod, BinaryenGtUInt32(), BinaryenArrayLen(mod, local_get(array, ref_array_type())), const_i32(index)),
-                                     BinaryenArrayGet(mod, local_get(array, ref_array_type()), const_i32(index), anyref(), false),
-                                     null()));
+        return at_or_null(array, index, value, [&]()
+                          {
+                              return null();
+                          });
     }
 
     expr_ref_list operator()(const function_call& p);
@@ -430,7 +439,7 @@ struct compiler : ext_types
 
         auto ups = gather_upvalues(req_ups);
 
-        auto sig       = BinaryenTypeFromHeapType(BinaryenFunctionGetType(func), false);
+        auto sig = BinaryenTypeFromHeapType(BinaryenFunctionGetType(func), false);
         return build_closure(BinaryenRefFunc(mod, name, sig), std::move(ups));
     }
 

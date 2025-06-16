@@ -22,9 +22,13 @@ expr_ref_list compiler::open_basic_lib()
         result.push_back(set_var(name, add_func_ref(name, args, usage, vararg, f)));
     };
 
-    add_func("assert", {"v", "message"}, false, [this]()
+    add_func("assert", {"v" /*, "message"*/}, false, [this]()
              {
-                 return std::array{BinaryenUnreachable(mod)};
+                 auto alt = [&]()
+                 {
+                     return add_string("assertion failed!");
+                 };
+                 return std::array{make_if(_runtime.call(functions::to_bool, get_var("v")), make_return(local_get(args_index, ref_array_type())), throw_error(at_or_null(args_index, 1, nullptr, alt)))};
              });
     add_func("collectgarbage", {"opt", "arg"}, false, [this]()
              {
