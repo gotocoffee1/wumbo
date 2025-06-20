@@ -231,6 +231,16 @@ struct ext_types : utils
         return BinaryenStructNew(mod, &num, 1, BinaryenTypeGetHeapType(type<value_type::integer>()));
     }
 
+    expr_ref unbox_number(expr_ref num)
+    {
+        return BinaryenStructGet(mod, 0, num, number_type(), false);
+    }
+
+    expr_ref unbox_integer(expr_ref num)
+    {
+        return BinaryenStructGet(mod, 0, num, integer_type(), false);
+    }
+
     static BinaryenType number_type()
     {
         return BinaryenTypeFloat64();

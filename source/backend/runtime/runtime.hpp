@@ -1,7 +1,7 @@
 #pragma once
 
-#include "binaryen-c.h"
 #include "backend/wasm_util.hpp"
+#include "binaryen-c.h"
 #include <type_traits>
 
 #define RUNTIME_FUNCTIONS(DO)                                                    \
@@ -35,6 +35,9 @@
     DO(to_number, anyref(), anyref())                                            \
     DO(lua_str_to_js_array, type<value_type::string>(), BinaryenTypeExternref()) \
     DO(js_array_to_lua_str, BinaryenTypeExternref(), type<value_type::string>()) \
+    DO(get_type, anyref(), size_type())                                          \
+    DO(to_js_int, anyref(), integer_type())                                      \
+    DO(to_js_string, anyref(), BinaryenTypeExternref())                          \
     DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 
 namespace wumbo

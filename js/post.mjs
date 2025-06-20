@@ -108,11 +108,21 @@ export const newInstance = async ({
     const bytes = new TextEncoder().encode(txt);
     const [exports, wat] = await load_func(bytes);
 
-    return [
-      WebAssembly.promising
-        ? WebAssembly.promising(exports.init_env)
-        : exports.init_env,
-      wat,
-    ];
+    const func = WebAssembly.promising
+      ? WebAssembly.promising(exports.init_env)
+      : () =>
+          new Promise((resolve) => {
+            resolve(exports.init_env());
+          });
+    const result = async () => {
+      const ret = await func();
+      switch (exports.get_type(ret)) {
+        case 2:
+          return exports.to_js_int(ret);
+        case 4:
+          return exports.to_js_string(ret);
+      }
+    };
+    return [result, wat];
   };
 };

@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "ast/ast.hpp"
+#include "binaryen-c.h"
 #include "func_stack.hpp"
 #include "runtime/runtime.hpp"
 #include "utils/util.hpp"
@@ -515,17 +516,26 @@ struct compiler : ext_types
 
         append(env, open_basic_lib());
 
-        auto start = add_func_ref("*init", chunk, {}, {}, true);
+        auto init = add_func_ref("*init", chunk, {}, {}, true);
         BinaryenAddFunctionExport(mod, "*init", "init");
 
-        env.push_back(BinaryenDrop(mod, call(start, null())));
+        env.push_back(call(init, null()));
+
+        _runtime.require(functions::get_type);
+        export_func("get_type");
+        _runtime.require(functions::to_js_int);
+        export_func("to_js_int");
+        _runtime.require(functions::to_js_string);
+        export_func("to_js_string");
+        auto exception = help_var_scope{_func_stack, anyref()};
 
         const char* tags[] = {error_tag};
         expr_ref catches[] = {
             make_block(std::array{
-                BinaryenDrop(mod, BinaryenPop(mod, anyref())),
-                BinaryenNop(mod),
-                //BinaryenUnreachable(mod),
+
+                //local_set(exception, BinaryenPop(mod, anyref())),
+
+                make_return(BinaryenPop(mod, anyref())),
             })};
 
         auto try_ = BinaryenTry(mod,
@@ -541,7 +551,7 @@ struct compiler : ext_types
         BinaryenAddFunction(mod,
                             "*init_env",
                             BinaryenTypeNone(),
-                            BinaryenTypeNone(),
+                            anyref(),
                             std::data(locals),
                             std::size(locals),
                             try_);

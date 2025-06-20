@@ -1,10 +1,11 @@
 #include "runtime.hpp"
 
+#include "backend/wasm_util.hpp"
 #include "binaryen-c.h"
 #include "utils/type.hpp"
-#include "backend/wasm_util.hpp"
 
 #include <array>
+#include <cstdint>
 #include <functional>
 
 namespace wumbo
@@ -584,6 +585,61 @@ build_return_t runtime::js_array_to_lua_str()
 
                 make_return(local_get(2, type<value_type::string>())),
             })};
+}
+
+build_return_t runtime::get_type()
+{
+    auto v = local_get(0, anyref());
+
+    auto casts = std::array{
+        value_type::boolean,
+        value_type::number,
+        value_type::integer,
+        value_type::string,
+        value_type::function,
+        value_type::table,
+        value_type::userdata,
+        value_type::thread,
+    };
+
+    return {std::vector<BinaryenType>{},
+            make_block(switch_value(v, casts, [&](value_type type, expr_ref exp)
+                                    {
+                                        int32_t num;
+                                        switch (type)
+                                        {
+                                        case value_type::nil:
+                                        case value_type::boolean:
+                                        case value_type::integer:
+                                        case value_type::number:
+                                        case value_type::string:
+                                        case value_type::function:
+                                        case value_type::userdata:
+                                        case value_type::thread:
+                                        case value_type::table:
+                                            num = static_cast<int32_t>(type);
+                                            break;
+                                        default:
+                                            return BinaryenUnreachable(mod);
+                                        }
+
+                                        auto ret = make_return(const_i32(num));
+                                        return exp ? make_block(std::array{
+                                                         drop(exp),
+                                                         ret,
+                                                     })
+                                                   : ret;
+                                    }))};
+}
+
+build_return_t runtime::to_js_int()
+{
+    return {std::vector<BinaryenType>{}, unbox_integer(BinaryenRefCast(mod, local_get(0, anyref()), type<value_type::integer>()))};
+}
+
+build_return_t runtime::to_js_string()
+{
+    return {std::vector<BinaryenType>{}, call(functions::lua_str_to_js_array, BinaryenRefCast(mod, local_get(0, anyref()), type<value_type::string>()))};
 }
 
 build_return_t runtime::invoke()
