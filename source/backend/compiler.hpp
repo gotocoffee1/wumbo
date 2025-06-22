@@ -521,12 +521,12 @@ struct compiler : ext_types
 
         env.push_back(call(init, null()));
 
-        _runtime.require(functions::get_type);
-        export_func("get_type");
-        _runtime.require(functions::to_js_int);
-        export_func("to_js_int");
-        _runtime.require(functions::to_js_string);
-        export_func("to_js_string");
+        export_func(_runtime.require(functions::get_type).name);
+        export_func(_runtime.require(functions::to_js_int).name);
+        export_func(_runtime.require(functions::to_js_string).name);
+        export_func(_runtime.require(functions::array_at).name);
+        export_func(_runtime.require(functions::get_array_size).name);
+
         auto exception = help_var_scope{_func_stack, anyref()};
 
         const char* tags[] = {error_tag};
@@ -554,7 +554,7 @@ struct compiler : ext_types
                             anyref(),
                             std::data(locals),
                             std::size(locals),
-                            try_);
+                            make_block(env));
 
         BinaryenAddFunctionExport(mod, "*init_env", "init_env");
     }

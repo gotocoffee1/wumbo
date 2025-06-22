@@ -642,6 +642,16 @@ build_return_t runtime::to_js_string()
     return {std::vector<BinaryenType>{}, call(functions::lua_str_to_js_array, BinaryenRefCast(mod, local_get(0, anyref()), type<value_type::string>()))};
 }
 
+build_return_t runtime::get_array_size()
+{
+    return {std::vector<BinaryenType>{}, array_len(local_get(0, ref_array_type()))};
+}
+
+build_return_t runtime::array_at()
+{
+    return {std::vector<BinaryenType>{}, array_get(local_get(0, ref_array_type()), local_get(1, size_type()), anyref())};
+}
+
 build_return_t runtime::invoke()
 {
     auto casts = std::array{

@@ -38,6 +38,8 @@
     DO(get_type, anyref(), size_type())                                          \
     DO(to_js_int, anyref(), integer_type())                                      \
     DO(to_js_string, anyref(), BinaryenTypeExternref())                          \
+    DO(get_array_size, ref_array_type(), size_type())                            \
+    DO(array_at, create_type(ref_array_type(), size_type()), anyref())           \
     DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 
 namespace wumbo

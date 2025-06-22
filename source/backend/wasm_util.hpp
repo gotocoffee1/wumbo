@@ -656,6 +656,7 @@ struct ext_types : utils
         }
 
         BinaryenAddTag(mod, error_tag, anyref(), BinaryenTypeNone());
+        BinaryenAddTagExport(mod, error_tag, error_tag);
 
         types[static_cast<std::underlying_type_t<value_type>>(value_type::boolean) + 3] = BinaryenTypeI31ref();
     }

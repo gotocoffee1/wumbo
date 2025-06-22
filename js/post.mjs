@@ -114,13 +114,34 @@ export const newInstance = async ({
           new Promise((resolve) => {
             resolve(exports.init_env());
           });
-    const result = async () => {
-      const ret = await func();
-      switch (exports.get_type(ret)) {
+
+    const luaToJs = (obj) => {
+      switch (exports.get_type(obj)) {
         case 2:
-          return exports.to_js_int(ret);
+          return exports.to_js_int(obj);
         case 4:
-          return exports.to_js_string(ret);
+          return exports.to_js_string(obj);
+      }
+    };
+
+    const result = async () => {
+      try {
+        const ret = await func();
+        if (!ret) return;
+        const size = exports.get_array_size(ret);
+        if (size === 0) return;
+        if (size === 1) return luaToJs(exports.array_at(ret, 0));
+        const jsResult = new Array(size);
+        for (let i = 0; i < size; i++) {
+          jsResult[i] = luaToJs(exports.array_at(ret, i));
+        }
+        return jsResult;
+      } catch (e) {
+        if (e instanceof WebAssembly.Exception) {
+          if (e.is(exports.error))
+            throw new Error(luaToJs(e.getArg(exports.error, 0)));
+        }
+        throw e;
       }
     };
     return [result, wat];
