@@ -110,9 +110,9 @@ export const newInstance = async ({
 
     const func = WebAssembly.promising
       ? WebAssembly.promising(exports.init_env)
-      : () =>
+      : (...args) =>
           new Promise((resolve) => {
-            resolve(exports.init_env());
+            resolve(exports.init_env(...args));
           });
 
     const luaToJs = (obj) => {
@@ -124,16 +124,23 @@ export const newInstance = async ({
       }
     };
 
-    const result = async () => {
+    const result = async (...jsArgs) => {
       try {
-        const ret = await func();
+        let args;
+        if (jsArgs.length > 0) {
+          args = exports.any_array_create(jsArgs.length);
+          for (let i = 0; i < jsArgs.length; ++i) {
+            exports.any_array_set(args, i, jsArgs[i]);
+          }
+        }
+        const ret = await func(args);
         if (!ret) return;
-        const size = exports.get_array_size(ret);
+        const size = exports.any_array_size(ret);
         if (size === 0) return;
-        if (size === 1) return luaToJs(exports.array_at(ret, 0));
+        if (size === 1) return luaToJs(exports.any_array_get(ret, 0));
         const jsResult = new Array(size);
-        for (let i = 0; i < size; i++) {
-          jsResult[i] = luaToJs(exports.array_at(ret, i));
+        for (let i = 0; i < size; ++i) {
+          jsResult[i] = luaToJs(exports.any_array_get(ret, i));
         }
         return jsResult;
       } catch (e) {

@@ -524,8 +524,10 @@ struct compiler : ext_types
         export_func(_runtime.require(functions::get_type).name);
         export_func(_runtime.require(functions::to_js_int).name);
         export_func(_runtime.require(functions::to_js_string).name);
-        export_func(_runtime.require(functions::array_at).name);
-        export_func(_runtime.require(functions::get_array_size).name);
+        export_func(_runtime.require(functions::any_array_get).name);
+        export_func(_runtime.require(functions::any_array_set).name);
+        export_func(_runtime.require(functions::any_array_create).name);
+        export_func(_runtime.require(functions::any_array_size).name);
 
         auto exception = help_var_scope{_func_stack, anyref()};
 

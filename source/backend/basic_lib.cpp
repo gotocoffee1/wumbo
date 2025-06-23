@@ -32,7 +32,7 @@ expr_ref_list compiler::open_basic_lib()
              });
     add_func("collectgarbage", {"opt", "arg"}, false, [this]()
              {
-                 return std::array{BinaryenUnreachable(mod)};
+                 return std::array{BinaryenNop(mod)};
              });
     add_func("dofile", {"filename"}, false, [this]()
              {
