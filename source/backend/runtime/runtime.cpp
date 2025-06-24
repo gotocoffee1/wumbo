@@ -632,7 +632,17 @@ build_return_t runtime::get_type()
                                     }))};
 }
 
-build_return_t runtime::to_js_int()
+build_return_t runtime::box_integer()
+{
+    return {std::vector<BinaryenType>{}, new_integer(local_get(0, integer_type()))};
+}
+
+build_return_t runtime::box_number()
+{
+    return {std::vector<BinaryenType>{}, new_number(local_get(0, number_type()))};
+}
+
+build_return_t runtime::to_js_integer()
 {
     return {std::vector<BinaryenType>{}, unbox_integer(BinaryenRefCast(mod, local_get(0, anyref()), type<value_type::integer>()))};
 }

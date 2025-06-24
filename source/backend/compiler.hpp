@@ -510,7 +510,7 @@ struct compiler : ext_types
 
     auto convert(const block& chunk)
     {
-        function_frame frame{_func_stack, 0, std::nullopt};
+        function_frame frame{_func_stack, 1, std::nullopt};
 
         auto env = setup_env();
 
@@ -519,41 +519,23 @@ struct compiler : ext_types
         auto init = add_func_ref("*init", chunk, {}, {}, true);
         BinaryenAddFunctionExport(mod, "*init", "init");
 
-        env.push_back(call(init, null()));
+        env.push_back(call(init, local_get(0, ref_array_type())));
 
         export_func(_runtime.require(functions::get_type).name);
-        export_func(_runtime.require(functions::to_js_int).name);
+        export_func(_runtime.require(functions::to_js_integer).name);
         export_func(_runtime.require(functions::to_js_string).name);
         export_func(_runtime.require(functions::any_array_get).name);
         export_func(_runtime.require(functions::any_array_set).name);
         export_func(_runtime.require(functions::any_array_create).name);
         export_func(_runtime.require(functions::any_array_size).name);
-
-        auto exception = help_var_scope{_func_stack, anyref()};
-
-        const char* tags[] = {error_tag};
-        expr_ref catches[] = {
-            make_block(std::array{
-
-                //local_set(exception, BinaryenPop(mod, anyref())),
-
-                make_return(BinaryenPop(mod, anyref())),
-            })};
-
-        auto try_ = BinaryenTry(mod,
-                                nullptr,
-                                make_block(env),
-                                std::data(tags),
-                                std::size(tags),
-                                std::data(catches),
-                                std::size(catches),
-                                nullptr);
+        export_func(_runtime.require(functions::box_number).name);
+        export_func(_runtime.require(functions::box_integer).name);
 
         auto locals = frame.get_local_type_list();
         BinaryenAddFunction(mod,
                             "*init_env",
-                            BinaryenTypeNone(),
-                            anyref(),
+                            ref_array_type(),
+                            ref_array_type(),
                             std::data(locals),
                             std::size(locals),
                             make_block(env));

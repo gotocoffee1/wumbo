@@ -115,10 +115,37 @@ export const newInstance = async ({
             resolve(exports.init_env(...args));
           });
 
+    const jsToLua = (obj) => {
+      switch (typeof obj) {
+        case "string":
+          break;
+        case "bigint":
+          return exports.box_integer(obj);
+        case "number":
+          if (Number.isInteger(obj)) {
+            return exports.box_integer(obj);
+          }
+          return exports.box_number(obj);
+        case "boolean":
+          break;
+        case "object":
+          if (value === null) {
+          } else if (Array.isArray(value)) {
+          } else {
+          }
+          break;
+        case "function":
+          break;
+        case "undefined":
+        default:
+          return null;
+      }
+    };
+
     const luaToJs = (obj) => {
       switch (exports.get_type(obj)) {
         case 2:
-          return exports.to_js_int(obj);
+          return exports.to_js_integer(obj);
         case 4:
           return exports.to_js_string(obj);
       }
@@ -126,11 +153,11 @@ export const newInstance = async ({
 
     const result = async (...jsArgs) => {
       try {
-        let args;
+        let args = null;
         if (jsArgs.length > 0) {
           args = exports.any_array_create(jsArgs.length);
           for (let i = 0; i < jsArgs.length; ++i) {
-            exports.any_array_set(args, i, jsArgs[i]);
+            exports.any_array_set(args, i, jsToLua(jsArgs[i]));
           }
         }
         const ret = await func(args);

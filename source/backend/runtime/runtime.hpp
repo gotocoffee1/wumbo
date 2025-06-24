@@ -4,40 +4,42 @@
 #include "binaryen-c.h"
 #include <type_traits>
 
-#define RUNTIME_FUNCTIONS(DO)                                                               \
-    DO(table_get, create_type(anyref(), anyref()), anyref())                                \
-    DO(table_set, create_type(anyref(), anyref(), anyref()), BinaryenTypeNone())            \
-    DO(to_bool, anyref(), bool_type())                                                      \
-    DO(to_bool_not, anyref(), bool_type())                                                  \
-    DO(logic_not, anyref(), anyref())                                                       \
-    DO(binary_not, anyref(), anyref())                                                      \
-    DO(minus, anyref(), anyref())                                                           \
-    DO(len, anyref(), anyref())                                                             \
-    DO(addition, create_type(anyref(), anyref()), anyref())                                 \
-    DO(subtraction, create_type(anyref(), anyref()), anyref())                              \
-    DO(multiplication, create_type(anyref(), anyref()), anyref())                           \
-    DO(division, create_type(anyref(), anyref()), anyref())                                 \
-    DO(division_floor, create_type(anyref(), anyref()), anyref())                           \
-    DO(exponentiation, create_type(anyref(), anyref()), anyref())                           \
-    DO(modulo, create_type(anyref(), anyref()), anyref())                                   \
-    DO(binary_or, create_type(anyref(), anyref()), anyref())                                \
-    DO(binary_and, create_type(anyref(), anyref()), anyref())                               \
-    DO(binary_xor, create_type(anyref(), anyref()), anyref())                               \
-    DO(binary_right_shift, create_type(anyref(), anyref()), anyref())                       \
-    DO(binary_left_shift, create_type(anyref(), anyref()), anyref())                        \
-    DO(equality, create_type(anyref(), anyref()), anyref())                                 \
-    DO(inequality, create_type(anyref(), anyref()), anyref())                               \
-    DO(less_than, create_type(anyref(), anyref()), anyref())                                \
-    DO(greater_than, create_type(anyref(), anyref()), anyref())                             \
-    DO(less_or_equal, create_type(anyref(), anyref()), anyref())                            \
-    DO(greater_or_equal, create_type(anyref(), anyref()), anyref())                         \
-    DO(to_string, anyref(), type<value_type::string>())                                     \
-    DO(to_number, anyref(), anyref())                                                       \
-    DO(lua_str_to_js_array, type<value_type::string>(), BinaryenTypeExternref())            \
-    DO(js_array_to_lua_str, BinaryenTypeExternref(), type<value_type::string>())            \
-    DO(get_type, anyref(), size_type())                                                     \
-    DO(to_js_int, anyref(), integer_type())                                                 \
-    DO(to_js_string, anyref(), BinaryenTypeExternref())                                     \
+#define RUNTIME_FUNCTIONS(DO)                                                                   \
+    DO(table_get, create_type(anyref(), anyref()), anyref())                                    \
+    DO(table_set, create_type(anyref(), anyref(), anyref()), BinaryenTypeNone())                \
+    DO(to_bool, anyref(), bool_type())                                                          \
+    DO(to_bool_not, anyref(), bool_type())                                                      \
+    DO(logic_not, anyref(), anyref())                                                           \
+    DO(binary_not, anyref(), anyref())                                                          \
+    DO(minus, anyref(), anyref())                                                               \
+    DO(len, anyref(), anyref())                                                                 \
+    DO(addition, create_type(anyref(), anyref()), anyref())                                     \
+    DO(subtraction, create_type(anyref(), anyref()), anyref())                                  \
+    DO(multiplication, create_type(anyref(), anyref()), anyref())                               \
+    DO(division, create_type(anyref(), anyref()), anyref())                                     \
+    DO(division_floor, create_type(anyref(), anyref()), anyref())                               \
+    DO(exponentiation, create_type(anyref(), anyref()), anyref())                               \
+    DO(modulo, create_type(anyref(), anyref()), anyref())                                       \
+    DO(binary_or, create_type(anyref(), anyref()), anyref())                                    \
+    DO(binary_and, create_type(anyref(), anyref()), anyref())                                   \
+    DO(binary_xor, create_type(anyref(), anyref()), anyref())                                   \
+    DO(binary_right_shift, create_type(anyref(), anyref()), anyref())                           \
+    DO(binary_left_shift, create_type(anyref(), anyref()), anyref())                            \
+    DO(equality, create_type(anyref(), anyref()), anyref())                                     \
+    DO(inequality, create_type(anyref(), anyref()), anyref())                                   \
+    DO(less_than, create_type(anyref(), anyref()), anyref())                                    \
+    DO(greater_than, create_type(anyref(), anyref()), anyref())                                 \
+    DO(less_or_equal, create_type(anyref(), anyref()), anyref())                                \
+    DO(greater_or_equal, create_type(anyref(), anyref()), anyref())                             \
+    DO(to_string, anyref(), type<value_type::string>())                                         \
+    DO(to_number, anyref(), anyref())                                                           \
+    DO(lua_str_to_js_array, type<value_type::string>(), BinaryenTypeExternref())                \
+    DO(js_array_to_lua_str, BinaryenTypeExternref(), type<value_type::string>())                \
+    DO(get_type, anyref(), size_type())                                                         \
+    DO(box_integer, integer_type(), type<value_type::integer>())                                \
+    DO(box_number, number_type(), type<value_type::number>())                                   \
+    DO(to_js_integer, anyref(), integer_type())                                                 \
+    DO(to_js_string, anyref(), BinaryenTypeExternref())                                         \
     DO(any_array_size, ref_array_type(), size_type())                                           \
     DO(any_array_create, size_type(), ref_array_type())                                         \
     DO(any_array_get, create_type(ref_array_type(), size_type()), anyref())                     \
