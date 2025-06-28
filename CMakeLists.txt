@@ -20,6 +20,7 @@ add_library(wumbo
   "source/backend/locals.cpp"
   "source/backend/runtime/runtime.cpp"
   "source/backend/runtime/operator.cpp"
+  "source/backend/runtime/table.cpp"
   "source/backend/assignment_call.cpp"
   "source/backend/expression.cpp"
   "source/backend/table.cpp"

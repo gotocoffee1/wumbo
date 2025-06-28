@@ -4,6 +4,7 @@
 #include <array>
 #include <cassert>
 #include <nonstd/span.hpp>
+#include <utility>
 #include <vector>
 
 #include "ast/ast.hpp"
@@ -434,14 +435,21 @@ struct compiler : ext_types
     }
 
     template<typename F>
-    auto add_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
+    auto get_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
     {
         auto [func, req_ups] = add_func(name, p, usage, vararg, f);
 
         auto ups = gather_upvalues(req_ups);
 
         auto sig = BinaryenTypeFromHeapType(BinaryenFunctionGetType(func), false);
-        return build_closure(BinaryenRefFunc(mod, name, sig), std::move(ups));
+        return std::tuple{BinaryenRefFunc(mod, name, sig), std::move(ups)};
+    }
+
+    template<typename F>
+    auto add_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
+    {
+        auto [ref, ups] = get_func_ref(name, p, usage, vararg, std::forward<F>(f));
+        return build_closure(ref, std::move(ups));
     }
 
     auto add_func_ref(const char* name, const block& inner, const name_list& p, nonstd::span<const local_usage> usage, bool vararg)

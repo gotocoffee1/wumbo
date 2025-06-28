@@ -130,6 +130,7 @@ export const newInstance = async ({
           break;
         case "object":
           if (value === null) {
+            return null;
           } else if (Array.isArray(value)) {
           } else {
           }
@@ -148,6 +149,8 @@ export const newInstance = async ({
           return exports.to_js_integer(obj);
         case 4:
           return exports.to_js_string(obj);
+        default:
+          return null;
       }
     };
 

@@ -554,7 +554,7 @@ struct ext_types : utils
                 struct_def{
                     {lua_function, ref_array},
                     {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
-                    {false, false},
+                    {false, true},
                     {"function_ref", "upvalues"},
                 },
             },

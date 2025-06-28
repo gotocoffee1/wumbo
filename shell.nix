@@ -28,6 +28,7 @@ pkgs.mkShell {
       python3
       nodejs_23
       lua5_3
+      luajit_2_0
     ];
   shellHook = ''
     export VCPKG_ROOT=${pkgs.vcpkg}/share/vcpkg
