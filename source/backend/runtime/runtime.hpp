@@ -2,6 +2,7 @@
 
 #include "backend/wasm_util.hpp"
 #include "binaryen-c.h"
+#include <cassert>
 #include <type_traits>
 
 #define RUNTIME_FUNCTIONS(DO)                                                                   \
@@ -88,6 +89,7 @@ struct runtime : ext_types
     void build();
 
     struct op;
+    struct tbl;
 
 #define DECL_FUNCS(name, ...) build_return_t name();
     RUNTIME_FUNCTIONS(DECL_FUNCS)
@@ -112,6 +114,97 @@ struct runtime : ext_types
                          params,
                          sig.return_type);
     }
+
+    struct function_stack
+    {
+        struct var
+        {
+            std::string name;
+            size_t name_offset;
+            using flag_t = uint8_t;
+            flag_t flags = 0;
+
+            const char* current_name() const
+            {
+                return name.c_str() + (name.size() - name_offset);
+            }
+            static constexpr flag_t is_used = 1 << 0;
+        };
+        BinaryenModuleRef mod;
+
+        std::vector<var> vars;
+        std::vector<BinaryenType> types;
+        size_t var_index = 0;
+
+        size_t alloc(BinaryenType type, std::string_view name = "")
+        {
+            for (size_t i = 0; i < vars.size(); ++i)
+            {
+                auto& var = vars[i];
+                if (type == types[i] && !(var.flags & var::is_used))
+                {
+                    var.name += name;
+                    var.name_offset = name.size();
+                    var.flags |= var::is_used;
+                    return i;
+                }
+            }
+            auto& var       = vars.emplace_back();
+            var.name        = name;
+            var.name_offset = name.size();
+            var.flags       = var::is_used;
+            types.emplace_back(type);
+
+            return vars.size() - 1;
+        }
+
+        void locals()
+        {
+            var_index = vars.size();
+        }
+
+        void free_local(size_t pos)
+        {
+            assert(pos < vars.size() && "invalid local index");
+            vars[pos].flags &= ~var::is_used;
+        }
+
+        auto add_function(const char* name, BinaryenType ret_type, expr_ref body)
+        {
+            auto func = BinaryenAddFunction(mod,
+                                            name,
+                                            BinaryenTypeCreate(std::data(types), var_index),
+                                            ret_type,
+                                            std::data(types) + var_index,
+                                            std::size(types) - var_index,
+                                            body);
+            for (size_t i = 0; i < vars.size(); ++i)
+                BinaryenFunctionSetLocalName(func, i, vars[i].name.c_str());
+
+            return func;
+        }
+
+        BinaryenType type(size_t index)
+        {
+            assert(index < vars.size() && "invalid local index");
+            return types[index];
+        }
+        expr_ref get(size_t index)
+        {
+            assert(index < vars.size() && "invalid local index");
+            return BinaryenLocalGet(mod, index, types[index]);
+        }
+        expr_ref set(size_t index, expr_ref value)
+        {
+            assert(index < vars.size() && "invalid local index");
+            return BinaryenLocalSet(mod, index, value);
+        }
+        expr_ref tee(size_t index, expr_ref value)
+        {
+            assert(index < vars.size() && "invalid local index");
+            return BinaryenLocalTee(mod, index, value, types[index]);
+        }
+    };
 };
 
 } // namespace wumbo

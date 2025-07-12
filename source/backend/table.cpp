@@ -2,10 +2,6 @@
 
 namespace wumbo
 {
-expr_ref compiler::calc_hash(expr_ref key)
-{
-    return const_i32(3);
-}
 
 expr_ref compiler::find_bucket(expr_ref table, expr_ref hash)
 {
@@ -64,9 +60,9 @@ expr_ref compiler::operator()(const table_constructor& p)
     auto array = (*this)(array_init);
 
     expr_ref table_init[] = {
-
         array,
         BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(exp), std::size(exp)),
+        null(),
     };
     return BinaryenStructNew(mod, std::data(table_init), std::size(table_init), BinaryenTypeGetHeapType(type<value_type::table>()));
 }

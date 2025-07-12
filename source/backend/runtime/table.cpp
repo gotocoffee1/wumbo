@@ -1,11 +1,125 @@
 #include "runtime.hpp"
 
-#include "binaryen-c.h"
 #include "backend/wasm_util.hpp"
+#include "binaryen-c.h"
 #include "utils/type.hpp"
 
 namespace wumbo
 {
+struct runtime::tbl
+{
+    static auto hash(runtime* self, const char* name, value_type vtype)
+    {
+        auto mod = self->mod;
+        runtime::function_stack stack{mod};
+
+        auto key = stack.alloc(self->type(vtype), "key");
+        stack.locals();
+
+        auto hash = [&]()
+        {
+            switch (vtype)
+            {
+            case value_type::integer:
+                return std::array{self->unbox_integer(stack.get(key))};
+            case value_type::number:
+                return std::array{BinaryenUnreachable(mod)};
+            case value_type::string:
+                return std::array{BinaryenUnreachable(mod)};
+            case value_type::nil:
+            case value_type::boolean:
+            case value_type::function:
+            case value_type::userdata:
+            case value_type::thread:
+            case value_type::table:
+            default:
+                return std::array{BinaryenUnreachable(mod)};
+            };
+        };
+
+        return stack.add_function(("*hash_"s + name).c_str(), self->size_type(), self->make_block(hash()));
+    }
+
+    static auto get_distance(runtime* self, const char* name, value_type vtype)
+    {
+        auto mod = self->mod;
+        runtime::function_stack stack{mod};
+
+        auto element = stack.alloc(self->hash_entry_type(), "element");
+        auto pos = stack.alloc(self->size_type(), "pos");
+        stack.locals();
+
+
+        BinaryenStructGet(mod, 0, stack.get(element), self->hash_entry_type(), false);
+
+        auto hash = [&]()
+        {
+
+        return std::array{BinaryenUnreachable(mod)};
+        };
+
+        return stack.add_function("*get_distance", self->size_type(), self->make_block(hash()));
+    }
+
+    static auto set(runtime* self, const char* name, value_type vtype)
+    {
+        auto mod = self->mod;
+
+        runtime::function_stack stack{mod};
+
+        auto table = stack.alloc(self->type<value_type::table>(), "table");
+        auto key   = stack.alloc(self->type(vtype), "key");
+        auto value = stack.alloc(anyref(), "value");
+        stack.locals();
+
+        size_t hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
+        size_t hash_value = stack.alloc(self->size_type(), "hash_value");
+        size_t dist = stack.alloc(self->size_type(), "dist");
+        size_t pos = stack.alloc(self->size_type(), "pos");
+        
+        self->binop(BinaryenAndInt32(),
+        stack.tee(hash_value, self->make_call(("*hash_"s + name).c_str(), stack.get(key), size_type())),
+        self->array_len(stack.get(hash_map)));
+        
+        auto body = std::array{
+            stack.set(hash_map, BinaryenStructGet(mod, tbl_hash_index, stack.get(table), self->hash_array_type(), false)),
+            BinaryenLoop(mod,
+                "+loop", BinaryenNop(mod)),
+                BinaryenArrayGet(mod, stack.get(hash_map), stack.get(pos), self->hash_array_type(), false),
+                
+        };
+
+                size_t i          = stack.alloc(self->size_type(), "i");
+        size_t new_array  = stack.alloc(self->ref_array_type(), "new_array");
+
+        // auto body = std::array{
+        //     self->local_set(i, self->array_len(bucket)),
+        //     BinaryenLoop(mod,
+        //                  "+loop",
+        //                  self->make_if(self->local_get(i, self->size_type()),
+        //                                self->make_block(std::array{
+        //                                    BinaryenBreak(mod,
+        //                                                  "+loop",
+        //                                                  BinaryenUnary(mod, BinaryenEqZInt32(), self->make_call(("*key_compare_"s + name).c_str(), std::array{
+        //                                                                                                                                                stack.get(key),
+        //                                                                                                                                                self->array_get(bucket, self->local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), self->local_get(i, self->size_type()), self->const_i32(2)), self->size_type()), anyref()),
+        //                                                                                                                                            },
+        //                                                                                                         bool_type())),
+        //                                                  nullptr),
+        //                                    BinaryenArraySet(mod, bucket, BinaryenBinary(mod, BinaryenAddInt32(), self->local_get(i, size_type()), self->const_i32(1)), stack.get(value)),
+        //                                    self->make_return(),
+        //                                }))),
+        //     self->resize_array(new_array, self->ref_array_type(), bucket, self->const_i32(2), true),
+
+        //     BinaryenStructSet(mod, tbl_hash_index, stack.get(table), stack.get(new_array)),
+        //     BinaryenArraySet(mod, self->local_get(new_array, self->ref_array_type()), self->const_i32(0), stack.get(key)),
+        //     BinaryenArraySet(mod, self->local_get(new_array, self->ref_array_type()), self->const_i32(1), stack.get(value)),
+        // };
+
+        return stack.add_function(("*table_set_"s + name).c_str(), BinaryenTypeNone(), self->make_block(body));
+    }
+};
+
 build_return_t runtime::table_set()
 {
     auto init_table_type_set = [this](const std::string& name, value_type vtype)
@@ -79,6 +193,7 @@ build_return_t runtime::table_set()
 
     //auto bucket = ;
 
+#
     auto casts = std::array{
         value_type::number,
         value_type::integer,
@@ -246,5 +361,4 @@ build_return_t runtime::table_get()
                                                                   anyref());
                                     }))};
 }
-
-}
+} // namespace wumbo

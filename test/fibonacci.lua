@@ -4,4 +4,4 @@ local function fibonacci(k)
 	end
 	return fibonacci(k - 1) + fibonacci(k - 2)
 end
-print(fibonacci(40))
+print(fibonacci(30))

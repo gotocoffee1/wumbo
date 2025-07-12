@@ -196,7 +196,8 @@ struct ext_types : utils
         BinaryenAddFunctionImport(mod, name, module_name, import_name ? import_name : name, params, results);
     }
 
-    static constexpr size_t type_count = 12;
+    static constexpr size_t type_count      = 14;
+    static constexpr size_t lua_type_offset = 5;
 
     std::array<BinaryenType, type_count> types;
 
@@ -205,12 +206,12 @@ struct ext_types : utils
     template<value_type T>
     BinaryenType type() const
     {
-        return types[static_cast<std::underlying_type_t<value_type>>(T) + 3];
+        return types[static_cast<std::underlying_type_t<value_type>>(T) + lua_type_offset];
     }
 
     BinaryenType type(value_type t) const
     {
-        return types[static_cast<std::underlying_type_t<value_type>>(t) + 3];
+        return types[static_cast<std::underlying_type_t<value_type>>(t) + lua_type_offset];
     }
 
     bool big_int = true;
@@ -435,6 +436,201 @@ struct ext_types : utils
     {
         return types[2];
     }
+    BinaryenType hash_entry_type() const
+    {
+        return types[4];
+    }
+    BinaryenType hash_array_type() const
+    {
+        return types[5];
+    }
+
+    template<typename Type, bool IsMutable = false, auto Pack = BinaryenPackedTypeNotPacked>
+    struct member_desc
+    {
+        using type                        = Type;
+        static constexpr const char* name = nullptr;
+        static constexpr auto pack        = Pack;
+        static constexpr bool is_mutable  = IsMutable;
+
+        template<typename TypeBuilder, typename TypeArray>
+        static BinaryenType get_type(TypeArray& build_types, TypeBuilderRef tb)
+        {
+            return TypeBuilder::template build_temp_type<type>(build_types, tb);
+        }
+    };
+
+    template<typename... Member>
+    struct struct_desc
+    {
+        using members = std::tuple<Member...>;
+
+        template<typename TypeBuilder, typename TypeArray>
+        static constexpr auto types(TypeArray& build_types, TypeBuilderRef tb)
+        {
+            return std::array{Member::template get_type<TypeBuilder>(build_types, tb)...};
+        }
+        static constexpr auto names()
+        {
+            return std::array{Member::name...};
+        }
+        static constexpr auto packs()
+        {
+            return std::array{Member::pack()...};
+        }
+        static constexpr auto mutables()
+        {
+            return std::array{Member::is_mutable...};
+        }
+
+        template<typename T>
+        static expr_ref get(BinaryenModuleRef mod, expr_ref self, bool signed_ = false)
+        {
+            return BinaryenStructGet(mod, tuple_index_v<T, members>, self, T::type(), signed_);
+        }
+
+        template<typename T>
+        static expr_ref set(BinaryenModuleRef mod, expr_ref self, expr_ref value)
+        {
+            return BinaryenStructSet(mod, tuple_index_v<T, members>, self, value);
+        }
+    };
+
+    template<bool IsNullable = false>
+    struct type_desc
+    {
+        static constexpr const char* name = nullptr;
+        static constexpr bool nullable    = IsNullable;
+
+        // template<typename type_builder>
+        // static BinaryenType get_type()
+        // {
+        //     return BinaryenTypeFromHeapType(BinaryenTypeGetHeapType(type_builder<type_desc>::build(mod)[0]), nullable);
+        // }
+    };
+
+    template<typename... Type>
+    struct type_builder
+    {
+        static constexpr size_t type_count = sizeof...(Type);
+
+        using types = std::tuple<Type...>;
+
+        template<typename T>
+        static BinaryenType build_temp_type(std::array<BinaryenType, type_count>& result, TypeBuilderRef tb)
+        {
+            if constexpr (std::is_base_of_v<type_desc<true>, T> || std::is_base_of_v<type_desc<false>, T>)
+            {
+                constexpr auto index = tuple_index_v<T, types>;
+                if (result[index] == BinaryenType{})
+                {
+                    result[index] = BinaryenTypeFromHeapType(TypeBuilderGetTempHeapType(tb, index), T::nullable);
+                }
+                return result[index];
+            }
+            else
+                return BinaryenTypeNone();
+        }
+
+        static auto build(ext_types& self)
+        {
+            TypeBuilderRef tb = TypeBuilderCreate(type_count);
+            std::array<BinaryenType, type_count> result;
+
+            BinaryenIndex i = 0;
+            ([&]()
+             {
+                 auto types = Type::members::template types<type_builder<Type...>>(result, tb);
+                 auto packs = Type::members::packs();
+                 auto muts  = Type::members::mutables();
+                 TypeBuilderSetStructType(
+                     tb,
+                     i++,
+                     types.data(),
+                     packs.data(),
+                     muts.data(),
+                     types.size());
+             }(),
+             ...);
+
+            BinaryenHeapType heap_types[type_count];
+
+            BinaryenIndex error_index;
+            TypeBuilderErrorReason error_reason;
+            if (!TypeBuilderBuildAndDispose(tb, (BinaryenHeapType*)&heap_types, &error_index, &error_reason))
+            {
+                throw;
+            }
+            i = 0;
+
+            ([&]()
+             {
+                 result[i] = BinaryenTypeFromHeapType(heap_types[i], Type::nullable);
+                 BinaryenModuleSetTypeName(self.mod, heap_types[i], Type::name);
+
+                 auto names = Type::members::names();
+                 for (size_t j = 0; j < std::size(names); ++j)
+                     BinaryenModuleSetFieldName(self.mod, heap_types[i], j, names[j]);
+             }(),
+             ...);
+
+            return result;
+        }
+    };
+
+    struct int64
+    {
+        // BinaryenTypeInt64
+    };
+
+    struct float64
+    {
+        // BinaryenTypeFloat64
+    };
+
+    struct any
+    {
+        // BinaryenTypeAnyref
+    };
+
+    struct number : type_desc<>
+    {
+        static constexpr const char* name = "number";
+
+        struct inner : member_desc<float64>
+        {
+        };
+
+        using members = struct_desc<inner>;
+    };
+
+    struct integer : type_desc<>
+    {
+        static constexpr const char* name = "integer";
+
+        struct inner : member_desc<int64>
+        {
+        };
+
+        using members = struct_desc<inner>;
+    };
+
+    struct upvalue : type_desc<>
+    {
+        static constexpr const char* name = "upvalue";
+
+        struct local_ref : member_desc<any, true>
+        {
+            static constexpr const char* name = "local_ref";
+        };
+
+        struct intre : member_desc<integer, true>
+        {
+            static constexpr const char* name = "integer";
+        };
+
+        using members = struct_desc<local_ref, intre>;
+    };
 
     void build_types()
     {
@@ -474,6 +670,8 @@ struct ext_types : utils
             bool nullable = true;
         };
 
+        type_builder<number, integer, upvalue>::build(*this);
+
         TypeBuilderRef tb = TypeBuilderCreate(type_count);
 
         BinaryenType ref_array          = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 0), true);
@@ -482,6 +680,9 @@ struct ext_types : utils
         BinaryenType lua_function  = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 3), true);
         BinaryenType upvalue       = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 1), true);
         BinaryenType upvalue_array = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 2), true);
+        BinaryenType hash_entry    = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 4), true);
+        BinaryenType hash_array    = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 5), true);
+        BinaryenType table         = TypeBuilderGetTempRefType(tb, TypeBuilderGetTempHeapType(tb, 13), true);
 
         def defs[] = {
             {
@@ -515,6 +716,23 @@ struct ext_types : utils
                 sig_def{
                     {ref_array, ref_array},
                     {ref_array},
+                },
+            },
+            {
+                "hash_entry",
+                struct_def{
+                    {anyref(), anyref()},
+                    {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
+                    {true, true},
+                    {"key", "value"},
+                },
+            },
+            {
+                "hash_array",
+                array_def{
+                    hash_entry,
+                    BinaryenPackedTypeNotPacked(),
+                    true,
                 },
             },
             {
@@ -577,10 +795,10 @@ struct ext_types : utils
             {
                 "table",
                 struct_def{
-                    {ref_array, ref_array},
-                    {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
-                    {true, true},
-                    {"array", "hash"},
+                    {ref_array, hash_array, table},
+                    {BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked(), BinaryenPackedTypeNotPacked()},
+                    {true, true, true},
+                    {"array", "hash", "metatable"},
                 },
             },
         };
@@ -658,7 +876,7 @@ struct ext_types : utils
         BinaryenAddTag(mod, error_tag, anyref(), BinaryenTypeNone());
         BinaryenAddTagExport(mod, error_tag, error_tag);
 
-        types[static_cast<std::underlying_type_t<value_type>>(value_type::boolean) + 3] = BinaryenTypeI31ref();
+        types[static_cast<std::underlying_type_t<value_type>>(value_type::boolean) + lua_type_offset] = BinaryenTypeI31ref();
     }
 
     expr_ref throw_error(expr_ref error)
