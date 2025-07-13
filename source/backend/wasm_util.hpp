@@ -5,6 +5,7 @@
 #include <array>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -454,22 +455,27 @@ struct ext_types : utils
         static constexpr bool is_mutable  = IsMutable;
 
         template<typename TypeBuilder, typename TypeArray>
-        static BinaryenType get_type(TypeArray& build_types, TypeBuilderRef tb)
+        static BinaryenType get_type(ext_types& self, TypeArray& build_types, TypeBuilderRef tb)
         {
-            return TypeBuilder::template build_temp_type<type>(build_types, tb);
+            return TypeBuilder::template build_temp_type<type>(self, build_types, tb);
+        }
+    };
+
+    template<typename... Type>
+    struct type_list
+    {
+        template<typename TypeBuilder, typename TypeArray>
+        static constexpr auto types(ext_types& self, TypeArray& build_types, TypeBuilderRef tb)
+        {
+            return std::array{Type::template get_type<TypeBuilder>(self, build_types, tb)...};
         }
     };
 
     template<typename... Member>
-    struct struct_desc
+    struct struct_desc : type_list<Member...>
     {
         using members = std::tuple<Member...>;
 
-        template<typename TypeBuilder, typename TypeArray>
-        static constexpr auto types(TypeArray& build_types, TypeBuilderRef tb)
-        {
-            return std::array{Member::template get_type<TypeBuilder>(build_types, tb)...};
-        }
         static constexpr auto names()
         {
             return std::array{Member::name...};
@@ -496,17 +502,29 @@ struct ext_types : utils
         }
     };
 
+    template<typename Type, bool IsMutable = false, auto Pack = BinaryenPackedTypeNotPacked>
+    struct array_desc
+    {
+        using type                 = Type;
+        static constexpr auto mut  = IsMutable;
+        static constexpr auto pack = Pack;
+    };
+
+    template<typename Params, typename Returns>
+    struct sig_desc
+    {
+        using params  = Params;
+        using returns = Returns;
+    };
+
     template<bool IsNullable = false>
     struct type_desc
     {
         static constexpr const char* name = nullptr;
         static constexpr bool nullable    = IsNullable;
-
-        // template<typename type_builder>
-        // static BinaryenType get_type()
-        // {
-        //     return BinaryenTypeFromHeapType(BinaryenTypeGetHeapType(type_builder<type_desc>::build(mod)[0]), nullable);
-        // }
+        using members                     = void;
+        using array                       = void;
+        using sig                         = void;
     };
 
     template<typename... Type>
@@ -514,10 +532,11 @@ struct ext_types : utils
     {
         static constexpr size_t type_count = sizeof...(Type);
 
-        using types = std::tuple<Type...>;
+        using types      = std::tuple<Type...>;
+        using type_array = std::array<BinaryenType, type_count>;
 
         template<typename T>
-        static BinaryenType build_temp_type(std::array<BinaryenType, type_count>& result, TypeBuilderRef tb)
+        static BinaryenType build_temp_type(ext_types& self, type_array& result, TypeBuilderRef tb)
         {
             if constexpr (std::is_base_of_v<type_desc<true>, T> || std::is_base_of_v<type_desc<false>, T>)
             {
@@ -529,27 +548,49 @@ struct ext_types : utils
                 return result[index];
             }
             else
-                return BinaryenTypeNone();
+                return T::get_type(self);
         }
 
         static auto build(ext_types& self)
         {
             TypeBuilderRef tb = TypeBuilderCreate(type_count);
-            std::array<BinaryenType, type_count> result;
+            type_array result;
 
             BinaryenIndex i = 0;
             ([&]()
              {
-                 auto types = Type::members::template types<type_builder<Type...>>(result, tb);
-                 auto packs = Type::members::packs();
-                 auto muts  = Type::members::mutables();
-                 TypeBuilderSetStructType(
-                     tb,
-                     i++,
-                     types.data(),
-                     packs.data(),
-                     muts.data(),
-                     types.size());
+                 if constexpr (!std::is_void_v<typename Type::members>)
+                 {
+                     auto types = Type::members::template types<type_builder<Type...>>(self, result, tb);
+                     auto packs = Type::members::packs();
+                     auto muts  = Type::members::mutables();
+                     TypeBuilderSetStructType(
+                         tb,
+                         i++,
+                         types.data(),
+                         packs.data(),
+                         muts.data(),
+                         types.size());
+                 }
+                 else if constexpr (!std::is_void_v<typename Type::array>)
+                 {
+                     TypeBuilderSetArrayType(
+                         tb,
+                         i++,
+                         build_temp_type<typename Type::array::type>(self, result, tb),
+                         Type::array::pack(),
+                         Type::array::mut);
+                 }
+                 else if constexpr (!std::is_void_v<typename Type::sig>)
+                 {
+                     auto params  = Type::sig::params::template types<type_builder<Type...>>(self, result, tb);
+                     auto returns = Type::sig::returns::template types<type_builder<Type...>>(self, result, tb);
+                     TypeBuilderSetSignatureType(
+                         tb,
+                         i++,
+                         TypeBuilderGetTempTupleType(tb, params.data(), params.size()),
+                         TypeBuilderGetTempTupleType(tb, returns.data(), returns.size()));
+                 }
              }(),
              ...);
 
@@ -568,9 +609,12 @@ struct ext_types : utils
                  result[i] = BinaryenTypeFromHeapType(heap_types[i], Type::nullable);
                  BinaryenModuleSetTypeName(self.mod, heap_types[i], Type::name);
 
-                 auto names = Type::members::names();
-                 for (size_t j = 0; j < std::size(names); ++j)
-                     BinaryenModuleSetFieldName(self.mod, heap_types[i], j, names[j]);
+                 if constexpr (!std::is_void_v<typename Type::members>)
+                 {
+                     auto names = Type::members::names();
+                     for (size_t j = 0; j < std::size(names); ++j)
+                         BinaryenModuleSetFieldName(self.mod, heap_types[i], j, names[j]);
+                 }
              }(),
              ...);
 
@@ -578,26 +622,35 @@ struct ext_types : utils
         }
     };
 
-    struct int64
+    struct int_
     {
-        // BinaryenTypeInt64
+        static BinaryenType get_type(ext_types& self)
+        {
+            return self.integer_type();
+        }
     };
 
-    struct float64
+    struct float_
     {
-        // BinaryenTypeFloat64
+        static BinaryenType get_type(ext_types& self)
+        {
+            return self.number_type();
+        }
     };
 
     struct any
     {
-        // BinaryenTypeAnyref
+        static BinaryenType get_type(ext_types&)
+        {
+            return BinaryenTypeAnyref();
+        }
     };
 
     struct number : type_desc<>
     {
         static constexpr const char* name = "number";
 
-        struct inner : member_desc<float64>
+        struct inner : member_desc<float_>
         {
         };
 
@@ -608,7 +661,7 @@ struct ext_types : utils
     {
         static constexpr const char* name = "integer";
 
-        struct inner : member_desc<int64>
+        struct inner : member_desc<int_>
         {
         };
 
@@ -630,6 +683,12 @@ struct ext_types : utils
         };
 
         using members = struct_desc<local_ref, intre>;
+    };
+
+    struct ref_array : type_desc<>
+    {
+        static constexpr const char* name = "ref_array";
+        using array                       = array_desc<any, true>;
     };
 
     void build_types()
@@ -670,7 +729,7 @@ struct ext_types : utils
             bool nullable = true;
         };
 
-        type_builder<number, integer, upvalue>::build(*this);
+        type_builder<ref_array, number, integer, upvalue>::build(*this);
 
         TypeBuilderRef tb = TypeBuilderCreate(type_count);
 
