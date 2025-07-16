@@ -1,7 +1,7 @@
-#include "ast/ast.hpp"
 #include "ast/analyze.hpp"
-#include "lua2wasm.hpp"
+#include "ast/ast.hpp"
 #include "backend/wasm.hpp"
+#include "lua2wasm.hpp"
 
 #include <emscripten.h>
 
