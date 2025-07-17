@@ -40,25 +40,31 @@ struct runtime::tbl
         return stack.add_function(("*hash_"s + name).c_str(), self->size_type(), self->make_block(hash()));
     }
 
-    static auto get_distance(runtime* self, const char* name, value_type vtype)
+    static auto get_distance(runtime* self, expr_ref hash_map)
     {
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        auto element = stack.alloc(self->hash_entry_type(), "element");
-        auto pos = stack.alloc(self->size_type(), "pos");
+        auto element = stack.alloc(self->get_type<hash_entry>(), "element");
+        auto pos     = stack.alloc(self->size_type(), "pos");
         stack.locals();
 
-
-        BinaryenStructGet(mod, 0, stack.get(element), self->hash_entry_type(), false);
-
+        auto hash_value = hash_entry::members::get<hash_entry::hash>(*self, stack.get(element));
+        auto best_pos = calc_pos(self, hash_map, hash_value);
+        self->binop(BinaryenSubInt32(), best_pos, stack.get(pos));
         auto hash = [&]()
         {
-
-        return std::array{BinaryenUnreachable(mod)};
+            return std::array{BinaryenUnreachable(mod)};
         };
 
-        return stack.add_function("*get_distance", self->size_type(), self->make_block(hash()));
+        return stack.add_function("*get_distance", self->size_type(), self->make_block(self->binop(BinaryenSubInt32(), best_pos, stack.get(pos))));
+    }
+
+    static expr_ref calc_pos(runtime* self, expr_ref hash_map, expr_ref hash_value)
+    {
+        return self->binop(BinaryenAndInt32(),
+                           hash_value,
+                           self->array_len(hash_map));
     }
 
     static auto set(runtime* self, const char* name, value_type vtype)
@@ -74,23 +80,22 @@ struct runtime::tbl
 
         size_t hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
         size_t hash_value = stack.alloc(self->size_type(), "hash_value");
-        size_t dist = stack.alloc(self->size_type(), "dist");
-        size_t pos = stack.alloc(self->size_type(), "pos");
-        
-        self->binop(BinaryenAndInt32(),
-        stack.tee(hash_value, self->make_call(("*hash_"s + name).c_str(), stack.get(key), size_type())),
-        self->array_len(stack.get(hash_map)));
-        
+        size_t dist       = stack.alloc(self->size_type(), "dist");
+        size_t pos        = stack.alloc(self->size_type(), "pos");
+
+        calc_pos(self, stack.get(hash_map), stack.tee(hash_value, self->make_call(("*hash_"s + name).c_str(), stack.get(key), size_type())));
+
         auto body = std::array{
             stack.set(hash_map, BinaryenStructGet(mod, tbl_hash_index, stack.get(table), self->hash_array_type(), false)),
             BinaryenLoop(mod,
-                "+loop", BinaryenNop(mod)),
-                BinaryenArrayGet(mod, stack.get(hash_map), stack.get(pos), self->hash_array_type(), false),
-                
+                         "+loop",
+                         BinaryenNop(mod)),
+            BinaryenArrayGet(mod, stack.get(hash_map), stack.get(pos), self->hash_array_type(), false),
+
         };
 
-                size_t i          = stack.alloc(self->size_type(), "i");
-        size_t new_array  = stack.alloc(self->ref_array_type(), "new_array");
+        size_t i         = stack.alloc(self->size_type(), "i");
+        size_t new_array = stack.alloc(self->ref_array_type(), "new_array");
 
         // auto body = std::array{
         //     self->local_set(i, self->array_len(bucket)),

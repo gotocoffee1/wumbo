@@ -510,15 +510,15 @@ struct ext_types : utils
         }
 
         template<typename T>
-        static expr_ref get(BinaryenModuleRef mod, expr_ref self, bool signed_ = false)
+        static expr_ref get(ext_types& self, expr_ref obj, bool signed_ = false)
         {
-            return BinaryenStructGet(mod, tuple_index_v<T, members>, self, T::type(), signed_);
+            return BinaryenStructGet(self.mod, tuple_index_v<T, members>, obj, self.get_type<typename T::type>(), signed_);
         }
 
         template<typename T>
-        static expr_ref set(BinaryenModuleRef mod, expr_ref self, expr_ref value)
+        static expr_ref set(ext_types& self, expr_ref obj, expr_ref value)
         {
-            return BinaryenStructSet(mod, tuple_index_v<T, members>, self, value);
+            return BinaryenStructSet(self.mod, tuple_index_v<T, members>, obj, value);
         }
     };
 
@@ -691,6 +691,14 @@ struct ext_types : utils
         }
     };
 
+    struct size
+    {
+        static BinaryenType get_type(const ext_types&)
+        {
+            return BinaryenTypeInt32();
+        }
+    };
+
     struct ref_array : type_desc<true>
     {
         static constexpr const char* name = "ref_array";
@@ -725,7 +733,7 @@ struct ext_types : utils
     {
         static constexpr const char* name = "hash_entry";
 
-        struct key : member_desc<any, true>
+        struct key : member_desc<any>
         {
             static constexpr const char* name = "key";
         };
@@ -734,7 +742,12 @@ struct ext_types : utils
         {
             static constexpr const char* name = "value";
         };
-        using members = struct_desc<key, value>;
+
+        struct hash : member_desc<size>
+        {
+            static constexpr const char* name = "hash";
+        };
+        using members = struct_desc<key, value, hash>;
     };
 
     struct hash_array : type_desc<true>
@@ -818,7 +831,7 @@ struct ext_types : utils
             static constexpr const char* name = "array";
         };
 
-        struct hash : member_desc<ref_array, true>
+        struct hash : member_desc<hash_array, true>
         {
             static constexpr const char* name = "hash";
         };
