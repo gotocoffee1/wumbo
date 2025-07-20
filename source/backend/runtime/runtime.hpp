@@ -36,7 +36,7 @@
     DO(to_number, anyref(), anyref())                                                           \
     DO(lua_str_to_js_array, type<value_type::string>(), BinaryenTypeExternref())                \
     DO(js_array_to_lua_str, BinaryenTypeExternref(), type<value_type::string>())                \
-    DO(get_type, anyref(), size_type())                                                         \
+    DO(get_type_num, anyref(), size_type())                                                     \
     DO(box_integer, integer_type(), type<value_type::integer>())                                \
     DO(box_number, number_type(), type<value_type::number>())                                   \
     DO(to_js_integer, anyref(), integer_type())                                                 \
@@ -169,19 +169,27 @@ struct runtime : ext_types
             vars[pos].flags &= ~var::is_used;
         }
 
-        auto add_function(const char* name, BinaryenType ret_type, expr_ref body)
+        template<typename F>
+        auto add_function(const char* name, BinaryenType ret_type, F&& body)
         {
-            auto func = BinaryenAddFunction(mod,
-                                            name,
-                                            BinaryenTypeCreate(std::data(types), var_index),
-                                            ret_type,
-                                            std::data(types) + var_index,
-                                            std::size(types) - var_index,
-                                            body);
-            for (size_t i = 0; i < vars.size(); ++i)
-                BinaryenFunctionSetLocalName(func, i, vars[i].name.c_str());
+            if (!BinaryenGetFunction(mod, name))
+            {
+                auto b    = body();
+                auto func = BinaryenAddFunction(mod,
+                                                name,
+                                                BinaryenTypeCreate(std::data(types), var_index),
+                                                ret_type,
+                                                std::data(types) + var_index,
+                                                std::size(types) - var_index,
+                                                b);
+                for (size_t i = 0; i < vars.size(); ++i)
+                    BinaryenFunctionSetLocalName(func, i, vars[i].name.c_str());
+            }
 
-            return func;
+            return [=](nonstd::span<const expr_ref> param)
+            {
+                return BinaryenCall(mod, name, const_cast<expr_ref*>(param.data()), param.size(), ret_type);
+            };
         }
 
         BinaryenType type(size_t index)

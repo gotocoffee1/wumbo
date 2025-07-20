@@ -529,7 +529,7 @@ struct compiler : ext_types
 
         env.push_back(call(init, local_get(0, ref_array_type())));
 
-        export_func(_runtime.require(functions::get_type).name);
+        export_func(_runtime.require(functions::get_type_num).name);
         export_func(_runtime.require(functions::to_js_integer).name);
         export_func(_runtime.require(functions::to_js_string).name);
         export_func(_runtime.require(functions::any_array_get).name);

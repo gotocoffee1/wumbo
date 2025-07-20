@@ -13,51 +13,34 @@ struct runtime::tbl
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        auto key = stack.alloc(self->type(vtype), "key");
-        stack.locals();
+        return stack.add_function(("*hash_"s + name).c_str(), self->size_type(), [&]()
+                                  {
+                                      auto key = stack.alloc(self->type(vtype), "key");
+                                      stack.locals();
 
-        auto hash = [&]()
-        {
-            switch (vtype)
-            {
-            case value_type::integer:
-                return std::array{self->unbox_integer(stack.get(key))};
-            case value_type::number:
-                return std::array{BinaryenUnreachable(mod)};
-            case value_type::string:
-                return std::array{BinaryenUnreachable(mod)};
-            case value_type::nil:
-            case value_type::boolean:
-            case value_type::function:
-            case value_type::userdata:
-            case value_type::thread:
-            case value_type::table:
-            default:
-                return std::array{BinaryenUnreachable(mod)};
-            };
-        };
+                                      auto hash = [&]()
+                                      {
+                                          switch (vtype)
+                                          {
+                                          case value_type::integer:
+                                              return std::array{self->unbox_integer(stack.get(key))};
+                                          case value_type::number:
+                                              return std::array{BinaryenUnreachable(mod)};
+                                          case value_type::string:
+                                              return std::array{BinaryenUnreachable(mod)};
+                                          case value_type::nil:
+                                          case value_type::boolean:
+                                          case value_type::function:
+                                          case value_type::userdata:
+                                          case value_type::thread:
+                                          case value_type::table:
+                                          default:
+                                              return std::array{BinaryenUnreachable(mod)};
+                                          };
+                                      };
 
-        return stack.add_function(("*hash_"s + name).c_str(), self->size_type(), self->make_block(hash()));
-    }
-
-    static auto get_distance(runtime* self, expr_ref hash_map)
-    {
-        auto mod = self->mod;
-        runtime::function_stack stack{mod};
-
-        auto element = stack.alloc(self->get_type<hash_entry>(), "element");
-        auto pos     = stack.alloc(self->size_type(), "pos");
-        stack.locals();
-
-        auto hash_value = hash_entry::members::get<hash_entry::hash>(*self, stack.get(element));
-        auto best_pos = calc_pos(self, hash_map, hash_value);
-        self->binop(BinaryenSubInt32(), best_pos, stack.get(pos));
-        auto hash = [&]()
-        {
-            return std::array{BinaryenUnreachable(mod)};
-        };
-
-        return stack.add_function("*get_distance", self->size_type(), self->make_block(self->binop(BinaryenSubInt32(), best_pos, stack.get(pos))));
+                                      return self->make_block(hash());
+                                  });
     }
 
     static expr_ref calc_pos(runtime* self, expr_ref hash_map, expr_ref hash_value)
@@ -67,36 +50,70 @@ struct runtime::tbl
                            self->array_len(hash_map));
     }
 
+    static auto get_distance(runtime* self)
+    {
+        auto mod = self->mod;
+        runtime::function_stack stack{mod};
+
+        return stack.add_function("*get_distance", self->size_type(), [&]()
+                                  {
+                                      auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
+                                      auto element  = stack.alloc(self->get_type<hash_entry>(), "element");
+                                      auto pos      = stack.alloc(self->size_type(), "pos");
+                                      stack.locals();
+
+                                      auto hash_value = hash_entry::members::get<hash_entry::hash>(*self, stack.get(element));
+                                      auto best_pos   = calc_pos(self, stack.get(hash_map), hash_value);
+                                      return self->make_block(std::array{self->binop(BinaryenSubInt32(), best_pos, stack.get(pos))});
+                                  });
+    }
+
     static auto set(runtime* self, const char* name, value_type vtype)
     {
         auto mod = self->mod;
 
         runtime::function_stack stack{mod};
 
-        auto table = stack.alloc(self->type<value_type::table>(), "table");
-        auto key   = stack.alloc(self->type(vtype), "key");
-        auto value = stack.alloc(anyref(), "value");
-        stack.locals();
+        auto set = [&]()
+        {
+            auto table = stack.alloc(self->type<value_type::table>(), "table");
+            auto key   = stack.alloc(self->type(vtype), "key");
+            auto value = stack.alloc(anyref(), "value");
+            stack.locals();
 
-        size_t hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
-        size_t hash_value = stack.alloc(self->size_type(), "hash_value");
-        size_t dist       = stack.alloc(self->size_type(), "dist");
-        size_t pos        = stack.alloc(self->size_type(), "pos");
+            size_t hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
+            size_t hash_value = stack.alloc(self->size_type(), "hash_value");
+            size_t dist       = stack.alloc(self->size_type(), "dist");
+            size_t pos        = stack.alloc(self->size_type(), "pos");
+            size_t ele_dist   = stack.alloc(self->size_type(), "ele_dist");
+            size_t ele        = stack.alloc(self->hash_entry_type(), "ele");
 
-        calc_pos(self, stack.get(hash_map), stack.tee(hash_value, self->make_call(("*hash_"s + name).c_str(), stack.get(key), size_type())));
+            auto tee_hash_map   = stack.tee(hash_map, table::members::get<table::hash>(*self, stack.get(table)));
+            auto tee_hash_value = stack.tee(hash_value, self->make_call(("*hash_"s + name).c_str(), stack.get(key), size_type()));
 
-        auto body = std::array{
-            stack.set(hash_map, BinaryenStructGet(mod, tbl_hash_index, stack.get(table), self->hash_array_type(), false)),
-            BinaryenLoop(mod,
-                         "+loop",
-                         BinaryenNop(mod)),
-            BinaryenArrayGet(mod, stack.get(hash_map), stack.get(pos), self->hash_array_type(), false),
+            auto get_distance_func = get_distance(self);
 
+            auto body = std::array{
+
+                stack.set(pos, calc_pos(self, tee_hash_map, tee_hash_value)),
+                BinaryenLoop(mod,
+                             "+loop",
+                             self->make_block(std::array{
+
+                                 self->make_if(BinaryenRefIsNull(mod, stack.tee(ele, hash_array::array::get(*self, stack.get(hash_map), stack.get(pos)))), self->make_return()),
+                                 self->make_if(self->binop(BinaryenLtUInt32(), stack.tee(ele_dist, get_distance_func(std::array{stack.get(hash_map), stack.get(ele), stack.get(pos)})), stack.get(dist)),
+                                               stack.set(dist, stack.get(ele_dist))),
+                                 stack.set(pos, self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1))),
+                                 BinaryenBreak(mod, "+loop", nullptr, nullptr),
+
+                             })),
+
+            };
+
+            size_t i         = stack.alloc(self->size_type(), "i");
+            size_t new_array = stack.alloc(self->ref_array_type(), "new_array");
+            return self->make_block(body);
         };
-
-        size_t i         = stack.alloc(self->size_type(), "i");
-        size_t new_array = stack.alloc(self->ref_array_type(), "new_array");
-
         // auto body = std::array{
         //     self->local_set(i, self->array_len(bucket)),
         //     BinaryenLoop(mod,
@@ -121,7 +138,7 @@ struct runtime::tbl
         //     BinaryenArraySet(mod, self->local_get(new_array, self->ref_array_type()), self->const_i32(1), stack.get(value)),
         // };
 
-        return stack.add_function(("*table_set_"s + name).c_str(), BinaryenTypeNone(), self->make_block(body));
+        return stack.add_function(("*table_set_"s + name).c_str(), BinaryenTypeNone(), set);
     }
 };
 

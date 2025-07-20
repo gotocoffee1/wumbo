@@ -144,7 +144,7 @@ export const newInstance = async ({
     };
 
     const luaToJs = (obj) => {
-      switch (exports.get_type(obj)) {
+      switch (exports.get_type_num(obj)) {
         case 2:
           return exports.to_js_integer(obj);
         case 4:

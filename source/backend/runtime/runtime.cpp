@@ -348,7 +348,7 @@ build_return_t runtime::js_array_to_lua_str()
             })};
 }
 
-build_return_t runtime::get_type()
+build_return_t runtime::get_type_num()
 {
     auto v = local_get(0, anyref());
 
