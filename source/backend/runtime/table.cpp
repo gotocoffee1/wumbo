@@ -25,9 +25,50 @@ struct runtime::tbl
                                           case value_type::integer:
                                               return std::array{self->integer_to_size(self->unbox_integer(stack.get(key)))};
                                           case value_type::number:
+                                              // BinaryenTruncSFloat64ToInt32
                                               return std::array{BinaryenUnreachable(mod)};
                                           case value_type::string:
-                                              return std::array{BinaryenUnreachable(mod)};
+                                          {
+                                              auto h       = stack.alloc(self->size_type(), "h");
+                                              auto len     = stack.alloc(self->size_type(), "len");
+                                              auto step    = stack.alloc(self->size_type(), "step");
+                                              auto tee_len = stack.tee(len, self->array_len(stack.get(key)));
+                                              return std::array{
+                                                  // unsigned int h = seed ^ (unsigned int)len;
+                                                  stack.set(h, self->binop(BinaryenXorInt32(), tee_len, self->const_i32(0x3eb1b260))),
+                                                  // size_t step = (len >> 5) + 1;
+                                                  stack.set(step, self->binop(BinaryenAddInt32(), self->binop(BinaryenShrSInt32(), stack.get(len), self->const_i32(5)), self->const_i32(1))),
+                                                  BinaryenLoop(mod,
+                                                               "+loop",
+                                                               self->make_block(std::array{
+
+                                                                   // while (l >= step)
+                                                                   self->make_if(self->binop(BinaryenGeUInt32(), stack.get(len), stack.get(step)),
+                                                                                 self->make_block(std::array{
+                                                                                     // h = h ^ ((h << 5) + (h >> 2) + (unsigned char)(str[l - 1]));
+                                                                                     stack.set(h,
+                                                                                               self->binop(BinaryenXorInt32(),
+                                                                                                           stack.get(h),
+                                                                                                           self->binop(BinaryenAddInt32(),
+                                                                                                                       self->binop(BinaryenAddInt32(),
+                                                                                                                                   self->binop(BinaryenShlInt32(),
+                                                                                                                                               stack.get(h),
+                                                                                                                                               self->const_i32(5)),
+                                                                                                                                   self->binop(BinaryenShrUInt32(),
+                                                                                                                                               stack.get(h),
+                                                                                                                                               self->const_i32(2))),
+                                                                                                                       string::get(*self,
+                                                                                                                                   stack.get(key),
+                                                                                                                                   self->binop(BinaryenSubInt32(), stack.get(len), self->const_i32(1)))))),
+                                                                                 })),
+                                                                   // len -= step;
+                                                                   stack.set(len, self->binop(BinaryenSubInt32(), stack.get(len), stack.get(step))),
+                                                                   BinaryenBreak(mod, "+loop", nullptr, nullptr),
+                                                               })),
+                                                  // return h;
+                                                  stack.get(h),
+                                              };
+                                          }
                                           case value_type::nil:
                                           case value_type::boolean:
                                           case value_type::function:
@@ -43,7 +84,8 @@ struct runtime::tbl
                                   });
     }
 
-    static expr_ref calc_pos(runtime* self, expr_ref len, expr_ref hash_value)
+    static expr_ref
+    calc_pos(runtime* self, expr_ref len, expr_ref hash_value)
     {
         // TODO: use bin and
         return self->binop(BinaryenRemUInt32(),
