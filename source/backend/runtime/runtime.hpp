@@ -170,13 +170,13 @@ struct runtime : ext_types
         }
 
         template<typename F>
-        auto add_function(const char* name, BinaryenType ret_type, F&& body)
+        auto add_function(const std::string& name, BinaryenType ret_type, F&& body)
         {
-            if (!BinaryenGetFunction(mod, name))
+            if (!BinaryenGetFunction(mod, name.c_str()))
             {
                 auto b    = body();
                 auto func = BinaryenAddFunction(mod,
-                                                name,
+                                                name.c_str(),
                                                 BinaryenTypeCreate(std::data(types), var_index),
                                                 ret_type,
                                                 std::data(types) + var_index,
@@ -186,9 +186,11 @@ struct runtime : ext_types
                     BinaryenFunctionSetLocalName(func, i, vars[i].name.c_str());
             }
 
-            return [=](nonstd::span<const expr_ref> param)
+            return [=](nonstd::span<const expr_ref> param, bool return_call = false)
             {
-                return BinaryenCall(mod, name, const_cast<expr_ref*>(param.data()), param.size(), ret_type);
+                if (return_call)
+                    return BinaryenReturnCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
+                return BinaryenCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
             };
         }
 

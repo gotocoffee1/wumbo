@@ -59,11 +59,10 @@ expr_ref compiler::operator()(const table_constructor& p)
 
     auto array = (*this)(array_init);
 
-    expr_ref table_init[] = {
-        array,
-        BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(exp), std::size(exp)),
-        null(),
-    };
-    return BinaryenStructNew(mod, std::data(table_init), std::size(table_init), BinaryenTypeGetHeapType(type<value_type::table>()));
+    return table::create(*this, std::array{
+                                   array,
+                                   hash_array::create_fixed(*this, exp),
+                                   null(),
+                               });
 }
 } // namespace wumbo
