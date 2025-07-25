@@ -23,17 +23,17 @@ struct runtime::tbl
                                           switch (vtype)
                                           {
                                           case value_type::integer:
-                                              return std::array{self->integer_to_size(self->unbox_integer(stack.get(key)))};
+                                              return std::vector{self->integer_to_size(self->unbox_integer(stack.get(key)))};
                                           case value_type::number:
                                               // BinaryenTruncSFloat64ToInt32
-                                              return std::array{BinaryenUnreachable(mod)};
+                                              return std::vector{BinaryenUnreachable(mod)};
                                           case value_type::string:
                                           {
                                               auto h       = stack.alloc(self->size_type(), "h");
                                               auto len     = stack.alloc(self->size_type(), "len");
                                               auto step    = stack.alloc(self->size_type(), "step");
                                               auto tee_len = stack.tee(len, self->array_len(stack.get(key)));
-                                              return std::array{
+                                              return std::vector{
                                                   // unsigned int h = seed ^ (unsigned int)len;
                                                   stack.set(h, self->binop(BinaryenXorInt32(), tee_len, self->const_i32(0x3eb1b260))),
                                                   // size_t step = (len >> 5) + 1;
@@ -60,10 +60,10 @@ struct runtime::tbl
                                                                                                                        string::get(*self,
                                                                                                                                    stack.get(key),
                                                                                                                                    self->binop(BinaryenSubInt32(), stack.get(len), self->const_i32(1)))))),
+                                                                                     // len -= step;
+                                                                                     stack.set(len, self->binop(BinaryenSubInt32(), stack.get(len), stack.get(step))),
+                                                                                     BinaryenBreak(mod, "+loop", nullptr, nullptr),
                                                                                  })),
-                                                                   // len -= step;
-                                                                   stack.set(len, self->binop(BinaryenSubInt32(), stack.get(len), stack.get(step))),
-                                                                   BinaryenBreak(mod, "+loop", nullptr, nullptr),
                                                                })),
                                                   // return h;
                                                   stack.get(h),
@@ -76,7 +76,7 @@ struct runtime::tbl
                                           case value_type::thread:
                                           case value_type::table:
                                           default:
-                                              return std::array{BinaryenUnreachable(mod)};
+                                              return std::vector{BinaryenUnreachable(mod)};
                                           };
                                       };
 
@@ -108,10 +108,10 @@ struct runtime::tbl
                                       auto len = stack.alloc(self->size_type(), "len");
 
                                       auto hash_value = hash_entry::get<hash_entry::hash>(*self, stack.get(element));
-                                      auto best_pos   = calc_pos(self, stack.tee(len, self->array_len(stack.get(hash_map))), hash_value);
+                                      auto best_pos   = calc_pos(self, stack.get(len), hash_value);
                                       return self->make_block(std::array{
 
-                                          calc_pos(self, self->binop(BinaryenSubInt32(), self->binop(BinaryenAddInt32(), stack.get(pos), stack.get(len)), best_pos), stack.get(len)),
+                                          calc_pos(self, self->binop(BinaryenSubInt32(), self->binop(BinaryenAddInt32(), stack.get(pos), stack.get(len)), best_pos), stack.tee(len, self->array_len(stack.get(hash_map)))),
                                       });
                                   });
     }
@@ -238,7 +238,7 @@ struct runtime::tbl
                                                self->make_block(std::array{
 
                                                    // return ele;
-                                                   self->make_return(stack.get(ele)),
+                                                   self->make_return(hash_entry::get<hash_entry::value>(*self, stack.get(ele))),
                                                })),
                                  // pos = calc_pos(pos + 1)
                                  stack.set(pos, calc_pos(self, self->array_len(stack.get(hash_map)), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
