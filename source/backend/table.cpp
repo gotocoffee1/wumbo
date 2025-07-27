@@ -65,6 +65,7 @@ expr_ref compiler::operator()(const table_constructor& p)
                                    array,
                                    hash_array::create_fixed(*this, temp),
                                 //    hash_array::create_fixed(*this, exp),
+                                   const_i32(0),
                                    null(),
                                });
 }

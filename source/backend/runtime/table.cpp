@@ -159,11 +159,16 @@ struct runtime::tbl
 
                                                    self->make_return(),
                                                })),
+                                 self->make_if(self->binop(BinaryenEqInt32(), stack.get(hash_value), hash_entry::get<hash_entry::hash>(*self, stack.get(ele))),
+                                               self->make_block(std::array{
+
+                                                   // return ele;
+                                                   self->make_return(hash_entry::get<hash_entry::value>(*self, stack.get(ele))),
+                                               })),
                                  // auto ele_dist = get_distance(hash_map, ele, pos);
                                  // if (ele_dist < dist)
                                  self->make_if(self->binop(BinaryenLtUInt32(), stack.tee(ele_dist, get_distance_func(std::array{stack.get(hash_map), stack.get(ele), stack.get(pos)})), stack.get(dist)),
                                                self->make_block(std::array{
-
                                                    // swap
                                                    hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
                                                    stack.set(new_ele, stack.get(ele)),

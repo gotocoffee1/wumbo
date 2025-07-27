@@ -701,6 +701,14 @@ struct ext_types : utils
         }
     };
 
+    struct size_
+    {
+        static BinaryenType get_type(const ext_types& self)
+        {
+            return self.size_type();
+        }
+    };
+
     struct int_
     {
         static BinaryenType get_type(const ext_types& self)
@@ -878,11 +886,16 @@ struct ext_types : utils
             static constexpr const char* name = "hash";
         };
 
+        struct hash_size : member_desc<size_, true>
+        {
+            static constexpr const char* name = "hash_size";
+        };
+
         struct metatable : member_desc<table, true>
         {
             static constexpr const char* name = "metatable";
         };
-        using members = member_list<array, hash, metatable>;
+        using members = member_list<array, hash, hash_size, metatable>;
     };
 
     using types_ = type_builder<ref_array,
