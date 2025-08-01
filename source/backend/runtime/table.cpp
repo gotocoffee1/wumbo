@@ -116,6 +116,98 @@ struct runtime::tbl
                                   });
     }
 
+    static auto map_insert(runtime* self)
+    {
+        auto mod = self->mod;
+        runtime::function_stack stack{mod};
+
+        return stack.add_function("*map_insert", BinaryenTypeNone(), [&]()
+                                  {
+                                      auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
+                                      auto new_ele  = stack.alloc(self->hash_entry_type(), "new_ele");
+
+                                      stack.locals();
+                                      size_t ele    = stack.alloc(self->hash_entry_type(), "ele");
+                                      auto dist     = stack.alloc(self->size_type(), "dist");
+                                      auto pos      = stack.alloc(self->size_type(), "pos");
+                                      auto ele_dist = stack.alloc(self->size_type(), "ele_dist");
+                                      auto len      = stack.alloc(self->size_type(), "len");
+
+                                      auto get_distance_func = get_distance(self);
+                                      auto tee_len           = stack.tee(len, self->array_len(stack.get(hash_map)));
+
+                                      return self->make_block(std::array{
+
+                                          stack.set(pos, calc_pos(self, tee_len, hash_entry::get<hash_entry::hash>(*self, stack.get(new_ele)))),
+
+                                          BinaryenLoop(mod,
+                                                       "+loop",
+                                                       self->make_block(std::array{
+
+                                                           self->make_if(BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), stack.get(pos)))),
+
+                                                                         self->make_block(std::array{
+                                                                             hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
+
+                                                                             self->make_return(),
+                                                                         })),
+                                                           // auto ele_dist = get_distance(hash_map, ele, pos);
+                                                           // if (ele_dist < dist)
+                                                           self->make_if(self->binop(BinaryenLtUInt32(), stack.tee(ele_dist, get_distance_func(std::array{stack.get(hash_map), stack.get(ele), stack.get(pos)})), stack.get(dist)),
+                                                                         self->make_block(std::array{
+                                                                             // swap
+                                                                             hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
+                                                                             stack.set(new_ele, stack.get(ele)),
+                                                                             // dist = ele_dist
+                                                                             stack.set(dist, stack.get(ele_dist)),
+                                                                         })),
+                                                           // pos = calc_pos(pos + 1)
+                                                           stack.set(pos, calc_pos(self, stack.get(len), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
+
+                                                           // dist++
+                                                           stack.set(dist, self->binop(BinaryenAddInt32(), stack.get(dist), self->const_i32(1))),
+                                                           BinaryenBreak(mod, "+loop", nullptr, nullptr),
+
+                                                       })),
+
+                                      });
+                                  });
+    }
+
+    static auto map_resize(runtime* self)
+    {
+        auto mod = self->mod;
+        runtime::function_stack stack{mod};
+
+        return stack.add_function("*map_resize", BinaryenTypeNone(), [&]()
+                                  {
+                                      auto tbl = stack.alloc(self->get_type<table>(), "table");
+                                      stack.locals();
+                                      auto hash_map     = stack.alloc(self->get_type<hash_array>(), "hash_map");
+                                      auto new_hash_map = stack.alloc(self->get_type<hash_array>(), "new_hash_map");
+                                      auto capacity     = stack.alloc(self->size_type(), "capacity");
+
+                                      auto tee_hash_map     = stack.tee(hash_map, table::get<table::hash>(*self, stack.get(tbl)));
+                                      auto tee_capacity     = stack.tee(capacity, self->array_len(tee_hash_map));
+                                      auto tee_new_hash_map = stack.tee(new_hash_map, hash_array::create(*self, self->binop(BinaryenMulInt32(), tee_capacity, self->const_i32(2))));
+                                      auto insert           = map_insert(self);
+                                      return self->make_block(std::array{
+                                          table::set<table::hash>(*self, stack.get(tbl), tee_new_hash_map),
+                                          BinaryenLoop(mod,
+                                                       "+loop",
+                                                       self->make_block(std::array{
+
+                                                           stack.set(capacity, self->binop(BinaryenSubInt32(), stack.get(capacity), self->const_i32(1))),
+                                                           insert(std::array{
+                                                               stack.get(new_hash_map),
+                                                               hash_array::get(*self, stack.get(hash_map), stack.get(capacity)),
+                                                           }),
+                                                           BinaryenBreak(mod, "+loop", stack.get(capacity), nullptr),
+                                                       })),
+                                      });
+                                  });
+    }
+
     static auto set(runtime* self, value_type vtype)
     {
         auto mod = self->mod;
@@ -136,18 +228,29 @@ struct runtime::tbl
             size_t ele_dist   = stack.alloc(self->size_type(), "ele_dist");
             size_t ele        = stack.alloc(self->hash_entry_type(), "ele");
             size_t new_ele    = stack.alloc(self->hash_entry_type(), "new_ele");
+            size_t capacity   = stack.alloc(self->size_type(), "capacity");
+            size_t size       = stack.alloc(self->size_type(), "size");
 
             auto tee_hash_map = stack.tee(hash_map, table::get<table::hash>(*self, stack.get(table)));
 
             auto tee_hash_value = stack.tee(hash_value, hash(self, vtype)(std::array{stack.get(key)}));
+            auto tee_capacity   = stack.tee(capacity, self->array_len(tee_hash_map));
+            auto tee_size       = stack.tee(size, table::get<table::hash_size>(*self, stack.get(table)));
 
             auto get_distance_func = get_distance(self);
+            auto map_resize_func   = map_resize(self);
 
             auto body = std::array{
+                // if (size > capacity * max_load_factor)
+                self->make_if(self->binop(BinaryenGtFloat32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_size), self->binop(BinaryenMulInt32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_capacity), BinaryenConst(mod, BinaryenLiteralFloat32(0.8f)))),
+                              self->make_block(std::array{
+                                  // resize
+                                  map_resize_func(std::array{stack.get(table)}),
+                                  stack.set(capacity, self->array_len(stack.tee(hash_map, table::get<table::hash>(*self, stack.get(table))))),
+                              })),
 
-                stack.set(pos, calc_pos(self, self->array_len(tee_hash_map), tee_hash_value)),
+                stack.set(pos, calc_pos(self, stack.get(capacity), tee_hash_value)),
                 stack.set(new_ele, hash_entry::create(*self, std::array{stack.get(key), stack.get(value), stack.get(hash_value)})),
-
                 BinaryenLoop(mod,
                              "+loop",
                              self->make_block(std::array{
@@ -156,14 +259,13 @@ struct runtime::tbl
 
                                                self->make_block(std::array{
                                                    hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
-
+                                                   table::set<table::hash_size>(*self, stack.get(table), self->binop(BinaryenAddInt32(), stack.get(size), self->const_i32(1))),
                                                    self->make_return(),
                                                })),
                                  self->make_if(self->binop(BinaryenEqInt32(), stack.get(hash_value), hash_entry::get<hash_entry::hash>(*self, stack.get(ele))),
                                                self->make_block(std::array{
-
-                                                   // return ele;
-                                                   self->make_return(hash_entry::get<hash_entry::value>(*self, stack.get(ele))),
+                                                   hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
+                                                   self->make_return(),
                                                })),
                                  // auto ele_dist = get_distance(hash_map, ele, pos);
                                  // if (ele_dist < dist)
@@ -176,15 +278,15 @@ struct runtime::tbl
                                                    stack.set(dist, stack.get(ele_dist)),
                                                })),
                                  // pos = calc_pos(pos + 1)
-                                 stack.set(pos, calc_pos(self, self->array_len(stack.get(hash_map)), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
+                                 stack.set(pos, calc_pos(self, stack.get(capacity), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
 
                                  // dist++
                                  stack.set(dist, self->binop(BinaryenAddInt32(), stack.get(dist), self->const_i32(1))),
                                  BinaryenBreak(mod, "+loop", nullptr, nullptr),
 
                              })),
-
             };
+
             return self->make_block(body);
         };
 
@@ -432,7 +534,6 @@ build_return_t runtime::table_get()
 
     // for (auto value : casts)
     //     init_table_type_get(type_name(value), value);
-
     return {std::vector<BinaryenType>{},
             make_block(switch_value(key,
                                     casts,
