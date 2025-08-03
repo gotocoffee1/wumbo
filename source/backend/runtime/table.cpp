@@ -132,6 +132,7 @@ struct runtime::tbl
                                       size_t ele    = stack.alloc(self->hash_entry_type(), "ele");
                                       auto ele_dist = stack.alloc(self->size_type(), "ele_dist");
                                       auto capacity = stack.alloc(self->size_type(), "capacity");
+                                      auto i        = stack.alloc(self->size_type(), "i");
 
                                       auto get_distance_func = get_distance(self);
 
@@ -210,6 +211,7 @@ struct runtime::tbl
 
                                       auto tee_hash_map     = stack.tee(hash_map, table::get<table::hash>(*self, stack.get(tbl)));
                                       auto tee_capacity     = stack.tee(capacity, self->array_len(tee_hash_map));
+                                      auto tee_capacity_dec = stack.tee(capacity, self->binop(BinaryenSubInt32(), stack.get(capacity), self->const_i32(1)));
                                       auto tee_new_hash_map = stack.tee(new_hash_map, hash_array::create(*self, self->binop(BinaryenMulInt32(), tee_capacity, self->const_i32(2))));
                                       auto insert           = map_insert(self);
                                       return self->make_block(std::array{
@@ -217,10 +219,7 @@ struct runtime::tbl
                                           BinaryenLoop(mod,
                                                        "+loop",
                                                        self->make_block(std::array{
-
-                                                           stack.set(capacity, self->binop(BinaryenSubInt32(), stack.get(capacity), self->const_i32(1))),
-
-                                                           BinaryenBreak(mod, "+loop", BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), stack.get(capacity)))), nullptr),
+                                                           BinaryenBreak(mod, "+loop", BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), tee_capacity_dec))), nullptr),
                                                            insert(std::array{
                                                                stack.get(new_hash_map),
                                                                stack.get(ele),
@@ -262,6 +261,14 @@ struct runtime::tbl
 
             auto get_distance_func = get_distance(self);
             auto map_resize_func   = map_resize(self);
+            auto set_ele           = [&]()
+            {
+                return hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele));
+            };
+            auto inc_size = [&]()
+            {
+                return table::set<table::hash_size>(*self, stack.get(table), self->binop(BinaryenAddInt32(), stack.get(size), self->const_i32(1)));
+            };
 
             auto body = std::array{
                 // if (size > capacity * max_load_factor)
@@ -279,15 +286,14 @@ struct runtime::tbl
                              self->make_block(std::array{
 
                                  self->make_if(BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), stack.get(pos)))),
-
                                                self->make_block(std::array{
-                                                   hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
-                                                   table::set<table::hash_size>(*self, stack.get(table), self->binop(BinaryenAddInt32(), stack.get(size), self->const_i32(1))),
+                                                   set_ele(),
+                                                   inc_size(),
                                                    self->make_return(),
                                                })),
                                  self->make_if(self->binop(BinaryenEqInt32(), stack.get(hash_value), hash_entry::get<hash_entry::hash>(*self, stack.get(ele))),
                                                self->make_block(std::array{
-                                                   hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
+                                                   set_ele(),
                                                    self->make_return(),
                                                })),
                                  // auto ele_dist = get_distance(hash_map, ele, pos);
@@ -295,8 +301,8 @@ struct runtime::tbl
                                  self->make_if(self->binop(BinaryenLtUInt32(), stack.tee(ele_dist, get_distance_func(std::array{stack.get(hash_map), stack.get(ele), stack.get(pos)})), stack.get(dist)),
                                                self->make_block(std::array{
                                                    // swap
-                                                   hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
-
+                                                   set_ele(),
+                                                   inc_size(),
                                                    map_insert_with_hint(self)(std::array{
                                                                                   stack.get(hash_map),
                                                                                   stack.get(ele),
@@ -304,9 +310,6 @@ struct runtime::tbl
                                                                                   self->binop(BinaryenAddInt32(), stack.get(ele_dist), self->const_i32(1)),
                                                                               },
                                                                               true),
-                                                   //   stack.set(new_ele, stack.get(ele)),
-                                                   //   // dist = ele_dist
-                                                   //   stack.set(dist, stack.get(ele_dist)),
                                                })),
                                  // pos = calc_pos(pos + 1)
                                  stack.set(pos, calc_pos(self, stack.get(capacity), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
@@ -374,11 +377,12 @@ struct runtime::tbl
                                                })),
                                  // if (ele.hash == hash_value && ele.key == key)
                                  self->make_if(self->binop(BinaryenEqInt32(), stack.get(hash_value), hash_entry::get<hash_entry::hash>(*self, stack.get(ele))),
-                                               self->make_block(std::array{
+                                               self->make_if(self->make_call(("*key_compare_"s + type_name(vtype)).c_str(), std::array{stack.get(key), hash_entry::get<hash_entry::key>(*self, stack.get(ele))}),
+                                                             self->make_block(std::array{
 
-                                                   // return ele;
-                                                   self->make_return(hash_entry::get<hash_entry::value>(*self, stack.get(ele))),
-                                               })),
+                                                                 // return ele;
+                                                                 self->make_return(hash_entry::get<hash_entry::value>(*self, stack.get(ele))),
+                                                             }))),
                                  // pos = calc_pos(pos + 1)
                                  stack.set(pos, calc_pos(self, self->array_len(stack.get(hash_map)), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
 
@@ -399,66 +403,6 @@ struct runtime::tbl
 
 build_return_t runtime::table_set()
 {
-    auto init_table_type_set = [this](const std::string& name, value_type vtype)
-    {
-        auto table = local_get(0, type<value_type::table>());
-        auto key   = local_get(1, type(vtype));
-        auto value = local_get(2, anyref());
-
-        auto bucket = BinaryenStructGet(mod,
-                                        tbl_hash_index,
-                                        table,
-                                        ref_array_type(),
-                                        false);
-
-        BinaryenType params[] = {
-            type<value_type::table>(),
-            type(vtype),
-            anyref(),
-        };
-
-        BinaryenType locals[] = {
-            size_type(),
-            ref_array_type(),
-        };
-
-        size_t i         = std::size(params);
-        size_t new_array = std::size(params) + 1;
-
-        expr_ref args[] = {
-            key,
-            array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, size_type()), const_i32(2)), size_type()), anyref()),
-        };
-
-        return BinaryenAddFunction(mod,
-                                   ("*table_set_"s + name).c_str(),
-                                   BinaryenTypeCreate(std::data(params), std::size(params)),
-                                   BinaryenTypeNone(),
-                                   std::data(locals),
-                                   std::size(locals),
-                                   make_block(std::array{
-                                       local_set(i, array_len(bucket)),
-                                       BinaryenLoop(mod,
-                                                    "+loop",
-                                                    make_if(local_get(i, size_type()),
-                                                            make_block(std::array{
-                                                                BinaryenBreak(mod,
-                                                                              "+loop",
-                                                                              BinaryenUnary(mod, BinaryenEqZInt32(), BinaryenCall(mod, ("*key_compare_" + name).c_str(), std::data(args), std::size(args), size_type())),
-                                                                              nullptr),
-                                                                BinaryenArraySet(mod,
-                                                                                 bucket,
-                                                                                 BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, size_type()), const_i32(1)),
-                                                                                 value),
-                                                                make_return(),
-                                                            }))),
-                                       resize_array(new_array, ref_array_type(), bucket, const_i32(2), true),
-
-                                       BinaryenStructSet(mod, tbl_hash_index, table, local_get(new_array, ref_array_type())),
-                                       BinaryenArraySet(mod, local_get(new_array, ref_array_type()), const_i32(0), key),
-                                       BinaryenArraySet(mod, local_get(new_array, ref_array_type()), const_i32(1), value),
-                                   }));
-    };
     auto table = local_get(0, anyref());
     auto key   = local_get(1, anyref());
     auto value = local_get(2, anyref());
@@ -469,13 +413,6 @@ build_return_t runtime::table_set()
         value_type::integer,
         value_type::string,
     };
-
-    //for (auto value : casts)
-    //    compare(type_name(value), value);
-
-    // for (auto value : casts)
-    //     init_table_type_set(type_name(value), value);
-
     return {std::vector<BinaryenType>{},
             make_block(switch_value(key, casts, [&](value_type type, expr_ref exp)
                                     {
@@ -500,58 +437,6 @@ build_return_t runtime::table_set()
 
 build_return_t runtime::table_get()
 {
-    auto init_table_type_get = [this](const std::string& name, value_type vtype)
-    {
-        auto table = local_get(0, type<value_type::table>());
-        auto key   = local_get(1, type(vtype));
-
-        auto bucket = BinaryenStructGet(mod,
-                                        tbl_hash_index,
-                                        table,
-                                        ref_array_type(),
-                                        false);
-
-        BinaryenType params[] = {
-            type<value_type::table>(),
-            type(vtype),
-        };
-
-        BinaryenType locals[] = {
-            size_type(),
-        };
-
-        size_t i = std::size(params);
-
-        return BinaryenAddFunction(mod,
-                                   ("*table_get_" + name).c_str(),
-                                   BinaryenTypeCreate(std::data(params), std::size(params)),
-                                   anyref(),
-                                   std::data(locals),
-                                   std::size(locals),
-                                   make_block(std::array{
-                                       local_set(i, array_len(bucket)),
-                                       BinaryenLoop(mod,
-                                                    "+loop",
-                                                    make_if(
-                                                        local_get(i, size_type()),
-                                                        make_block(std::array{
-                                                            BinaryenBreak(mod,
-                                                                          "+loop",
-                                                                          BinaryenUnary(mod,
-                                                                                        BinaryenEqZInt32(),
-                                                                                        make_call(("*key_compare_" + name).c_str(), std::array{
-                                                                                                                                        key,
-                                                                                                                                        array_get(bucket, local_tee(i, BinaryenBinary(mod, BinaryenSubInt32(), local_get(i, size_type()), const_i32(2)), size_type()), anyref()),
-                                                                                                                                    },
-                                                                                                  size_type())),
-                                                                          nullptr),
-                                                            make_return(BinaryenArrayGet(mod, bucket, BinaryenBinary(mod, BinaryenAddInt32(), local_get(i, size_type()), const_i32(1)), anyref(), false)),
-                                                        }))),
-
-                                       make_return(null()),
-                                   }));
-    };
-
     auto table = local_get(0, anyref());
     auto key   = local_get(1, anyref());
     table      = BinaryenRefCast(mod, table, type<value_type::table>());
@@ -565,8 +450,6 @@ build_return_t runtime::table_get()
     for (auto value : casts)
         compare(type_name(value), value);
 
-    // for (auto value : casts)
-    //     init_table_type_get(type_name(value), value);
     return {std::vector<BinaryenType>{},
             make_block(switch_value(key,
                                     casts,
