@@ -116,29 +116,27 @@ struct runtime::tbl
                                   });
     }
 
-    static auto map_insert(runtime* self)
+    static auto map_insert_with_hint(runtime* self)
     {
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function("*map_insert", BinaryenTypeNone(), [&]()
+        return stack.add_function("*map_insert_with_hint", BinaryenTypeNone(), [&]()
                                   {
                                       auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
                                       auto new_ele  = stack.alloc(self->hash_entry_type(), "new_ele");
+                                      auto pos      = stack.alloc(self->size_type(), "pos");
+                                      auto dist     = stack.alloc(self->size_type(), "dist");
 
                                       stack.locals();
                                       size_t ele    = stack.alloc(self->hash_entry_type(), "ele");
-                                      auto dist     = stack.alloc(self->size_type(), "dist");
-                                      auto pos      = stack.alloc(self->size_type(), "pos");
                                       auto ele_dist = stack.alloc(self->size_type(), "ele_dist");
-                                      auto len      = stack.alloc(self->size_type(), "len");
+                                      auto capacity = stack.alloc(self->size_type(), "capacity");
 
                                       auto get_distance_func = get_distance(self);
-                                      auto tee_len           = stack.tee(len, self->array_len(stack.get(hash_map)));
 
                                       return self->make_block(std::array{
-
-                                          stack.set(pos, calc_pos(self, tee_len, hash_entry::get<hash_entry::hash>(*self, stack.get(new_ele)))),
+                                          stack.set(capacity, self->array_len(stack.get(hash_map))),
 
                                           BinaryenLoop(mod,
                                                        "+loop",
@@ -148,7 +146,6 @@ struct runtime::tbl
 
                                                                          self->make_block(std::array{
                                                                              hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
-
                                                                              self->make_return(),
                                                                          })),
                                                            // auto ele_dist = get_distance(hash_map, ele, pos);
@@ -162,7 +159,7 @@ struct runtime::tbl
                                                                              stack.set(dist, stack.get(ele_dist)),
                                                                          })),
                                                            // pos = calc_pos(pos + 1)
-                                                           stack.set(pos, calc_pos(self, stack.get(len), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
+                                                           stack.set(pos, calc_pos(self, stack.get(capacity), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
 
                                                            // dist++
                                                            stack.set(dist, self->binop(BinaryenAddInt32(), stack.get(dist), self->const_i32(1))),
@@ -174,18 +171,42 @@ struct runtime::tbl
                                   });
     }
 
+    static auto map_insert(runtime* self)
+    {
+        auto mod = self->mod;
+        runtime::function_stack stack{mod};
+
+        return stack.add_function("*map_insert", BinaryenTypeNone(), [&]()
+                                  {
+                                      auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
+                                      auto new_ele  = stack.alloc(self->hash_entry_type(), "new_ele");
+
+                                      stack.locals();
+
+                                      return map_insert_with_hint(self)(std::array{
+                                                                            stack.get(hash_map),
+                                                                            stack.get(new_ele),
+
+                                                                            calc_pos(self, self->array_len(stack.get(hash_map)), hash_entry::get<hash_entry::hash>(*self, stack.get(new_ele))),
+                                                                            self->const_i32(0),
+                                                                        },
+                                                                        true);
+                                  });
+    }
+
     static auto map_resize(runtime* self)
     {
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function("*map_resize", BinaryenTypeNone(), [&]()
+        return stack.add_function("*map_grow", BinaryenTypeNone(), [&]()
                                   {
                                       auto tbl = stack.alloc(self->get_type<table>(), "table");
                                       stack.locals();
                                       auto hash_map     = stack.alloc(self->get_type<hash_array>(), "hash_map");
                                       auto new_hash_map = stack.alloc(self->get_type<hash_array>(), "new_hash_map");
                                       auto capacity     = stack.alloc(self->size_type(), "capacity");
+                                      auto ele          = stack.alloc(self->get_type<hash_entry>(), "ele");
 
                                       auto tee_hash_map     = stack.tee(hash_map, table::get<table::hash>(*self, stack.get(tbl)));
                                       auto tee_capacity     = stack.tee(capacity, self->array_len(tee_hash_map));
@@ -198,9 +219,11 @@ struct runtime::tbl
                                                        self->make_block(std::array{
 
                                                            stack.set(capacity, self->binop(BinaryenSubInt32(), stack.get(capacity), self->const_i32(1))),
+
+                                                           BinaryenBreak(mod, "+loop", BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), stack.get(capacity)))), nullptr),
                                                            insert(std::array{
                                                                stack.get(new_hash_map),
-                                                               hash_array::get(*self, stack.get(hash_map), stack.get(capacity)),
+                                                               stack.get(ele),
                                                            }),
                                                            BinaryenBreak(mod, "+loop", stack.get(capacity), nullptr),
                                                        })),
@@ -242,7 +265,7 @@ struct runtime::tbl
 
             auto body = std::array{
                 // if (size > capacity * max_load_factor)
-                self->make_if(self->binop(BinaryenGtFloat32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_size), self->binop(BinaryenMulInt32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_capacity), BinaryenConst(mod, BinaryenLiteralFloat32(0.8f)))),
+                self->make_if(self->binop(BinaryenGtFloat32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_size), self->binop(BinaryenMulFloat32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_capacity), BinaryenConst(mod, BinaryenLiteralFloat32(0.8f)))),
                               self->make_block(std::array{
                                   // resize
                                   map_resize_func(std::array{stack.get(table)}),
@@ -273,15 +296,24 @@ struct runtime::tbl
                                                self->make_block(std::array{
                                                    // swap
                                                    hash_array::set(*self, stack.get(hash_map), stack.get(pos), stack.get(new_ele)),
-                                                   stack.set(new_ele, stack.get(ele)),
-                                                   // dist = ele_dist
-                                                   stack.set(dist, stack.get(ele_dist)),
+
+                                                   map_insert_with_hint(self)(std::array{
+                                                                                  stack.get(hash_map),
+                                                                                  stack.get(ele),
+                                                                                  calc_pos(self, stack.get(capacity), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1))),
+                                                                                  self->binop(BinaryenAddInt32(), stack.get(ele_dist), self->const_i32(1)),
+                                                                              },
+                                                                              true),
+                                                   //   stack.set(new_ele, stack.get(ele)),
+                                                   //   // dist = ele_dist
+                                                   //   stack.set(dist, stack.get(ele_dist)),
                                                })),
                                  // pos = calc_pos(pos + 1)
                                  stack.set(pos, calc_pos(self, stack.get(capacity), self->binop(BinaryenAddInt32(), stack.get(pos), self->const_i32(1)))),
 
                                  // dist++
                                  stack.set(dist, self->binop(BinaryenAddInt32(), stack.get(dist), self->const_i32(1))),
+
                                  BinaryenBreak(mod, "+loop", nullptr, nullptr),
 
                              })),
@@ -352,6 +384,7 @@ struct runtime::tbl
 
                                  // dist++
                                  stack.set(dist, self->binop(BinaryenAddInt32(), stack.get(dist), self->const_i32(1))),
+
                                  BinaryenBreak(mod, "+loop", nullptr, nullptr),
 
                              })),

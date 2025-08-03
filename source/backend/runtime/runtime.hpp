@@ -186,7 +186,7 @@ struct runtime : ext_types
                     BinaryenFunctionSetLocalName(func, i, vars[i].name.c_str());
             }
 
-            return [=](nonstd::span<const expr_ref> param, bool return_call = false)
+            return [=, mod = mod](nonstd::span<const expr_ref> param, bool return_call = false)
             {
                 if (return_call)
                     return BinaryenReturnCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);

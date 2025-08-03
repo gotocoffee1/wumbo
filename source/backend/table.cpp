@@ -59,11 +59,9 @@ expr_ref compiler::operator()(const table_constructor& p)
 
     auto array = (*this)(array_init);
 
-
-    std::vector<expr_ref> temp(30, null());
     return table::create(*this, std::array{
                                    array,
-                                   hash_array::create_fixed(*this, temp),
+                                   hash_array::create_fixed(*this, std::array{null()}),
                                 //    hash_array::create_fixed(*this, exp),
                                    const_i32(0),
                                    null(),
