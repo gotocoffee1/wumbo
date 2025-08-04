@@ -292,10 +292,11 @@ struct runtime::tbl
                                                    self->make_return(),
                                                })),
                                  self->make_if(self->binop(BinaryenEqInt32(), stack.get(hash_value), hash_entry::get<hash_entry::hash>(*self, stack.get(ele))),
-                                               self->make_block(std::array{
-                                                   set_ele(),
-                                                   self->make_return(),
-                                               })),
+                                               self->make_if(self->compare(vtype)(std::array{stack.get(key), hash_entry::get<hash_entry::key>(*self, stack.get(ele))}),
+                                                             self->make_block(std::array{
+                                                                 set_ele(),
+                                                                 self->make_return(),
+                                                             }))),
                                  // auto ele_dist = get_distance(hash_map, ele, pos);
                                  // if (ele_dist < dist)
                                  self->make_if(self->binop(BinaryenLtUInt32(), stack.tee(ele_dist, get_distance_func(std::array{stack.get(hash_map), stack.get(ele), stack.get(pos)})), stack.get(dist)),
@@ -377,9 +378,8 @@ struct runtime::tbl
                                                })),
                                  // if (ele.hash == hash_value && ele.key == key)
                                  self->make_if(self->binop(BinaryenEqInt32(), stack.get(hash_value), hash_entry::get<hash_entry::hash>(*self, stack.get(ele))),
-                                               self->make_if(self->make_call(("*key_compare_"s + type_name(vtype)).c_str(), std::array{stack.get(key), hash_entry::get<hash_entry::key>(*self, stack.get(ele))}),
+                                               self->make_if(self->compare(vtype)(std::array{stack.get(key), hash_entry::get<hash_entry::key>(*self, stack.get(ele))}),
                                                              self->make_block(std::array{
-
                                                                  // return ele;
                                                                  self->make_return(hash_entry::get<hash_entry::value>(*self, stack.get(ele))),
                                                              }))),
@@ -446,9 +446,6 @@ build_return_t runtime::table_get()
         value_type::integer,
         value_type::string,
     };
-
-    for (auto value : casts)
-        compare(type_name(value), value);
 
     return {std::vector<BinaryenType>{},
             make_block(switch_value(key,

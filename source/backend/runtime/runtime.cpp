@@ -76,97 +76,87 @@ void runtime::build()
     }
 }
 
-BinaryenFunctionRef runtime::compare(const char* name, value_type vtype)
+runtime::function_stack::func_t runtime::compare(value_type vtype)
 {
-    auto casts = std::array{
-        vtype,
+    runtime::function_stack stack{mod};
+
+    auto cmp = [&]()
+    {
+        auto first  = stack.alloc(type(vtype), "first");
+        auto second = stack.alloc(anyref(), "second");
+        stack.locals();
+
+        auto casts = std::array{
+            vtype,
+        };
+        return make_block(
+            switch_value(stack.get(second),
+                         casts,
+                         [&](value_type type_right, expr_ref exp_right)
+                         {
+                             if (vtype != type_right)
+                             {
+                                 if (!exp_right)
+                                     return BinaryenUnreachable(mod);
+                                 return const_i32(0);
+                             }
+                             switch (type_right)
+                             {
+                             case value_type::integer:
+                                 return make_return(binop(BinaryenEqInt64(), integer::get<integer::inner>(*this, stack.get(first)), integer::get<integer::inner>(*this, exp_right)));
+                             case value_type::number:
+                                 return make_return(binop(BinaryenEqFloat64(), number::get<number::inner>(*this, stack.get(first)), number::get<number::inner>(*this, exp_right)));
+                             case value_type::table:
+                             case value_type::function:
+                             case value_type::thread:
+                                 return BinaryenRefEq(mod, stack.get(first), exp_right);
+
+                             case value_type::string:
+                             {
+                                 auto string_t = type<value_type::string>();
+
+                                 auto i           = stack.alloc(size_type(), "i");
+                                 auto exp_i       = stack.alloc(string_t, "exp_i");
+                                 auto exp_right_i = stack.alloc(string_t, "exp_right_i");
+
+                                 auto dec = [&](expr_ref first)
+                                 {
+                                     return binop(BinaryenSubInt32(),
+                                                  first,
+                                                  const_i32(1));
+                                 };
+
+                                 return make_return(
+                                     make_if(binop(BinaryenEqInt32(), stack.tee(i, array_len(stack.tee(exp_i, stack.get(0)))), array_len(stack.tee(exp_right_i, exp_right))),
+                                             BinaryenLoop(mod,
+                                                          "+loop",
+                                                          BinaryenIf(mod,
+                                                                     stack.get(i),
+                                                                     make_block(std::array{
+                                                                         BinaryenBreak(mod,
+                                                                                       "+loop",
+                                                                                       binop(BinaryenEqInt32(),
+                                                                                              string::get(*this, stack.get(exp_i), stack.tee(i, dec(stack.get(i)))),
+                                                                                             string::get(*this, stack.get(exp_right_i), stack.get(i))),
+                                                                                       nullptr),
+                                                                         const_i32(0),
+                                                                     }),
+                                                                     const_i32(1))),
+
+                                              const_i32(0)));
+                             }
+                             case value_type::nil:
+                             case value_type::boolean:
+                             case value_type::userdata:
+                             default:
+                                 return BinaryenUnreachable(mod);
+                             }
+                         }),
+            nullptr,
+            size_type());
     };
-    auto exp = local_get(0, type(vtype));
-
-    BinaryenType params[] = {
-        type(vtype),
-        anyref(),
-    };
-    std::vector<BinaryenType> vars;
-
-    auto block = make_block(switch_value(local_get(1, anyref()), casts, [&](value_type type_right, expr_ref exp_right)
-                                         {
-                                             if (vtype != type_right)
-                                             {
-                                                 if (!exp_right)
-                                                     return BinaryenUnreachable(mod);
-                                                 return const_i32(0);
-                                             }
-                                             switch (type_right)
-                                             {
-                                             case value_type::integer:
-                                                 return make_return(BinaryenBinary(mod, BinaryenEqInt64(), BinaryenStructGet(mod, 0, exp, integer_type(), false), BinaryenStructGet(mod, 0, exp_right, integer_type(), false)));
-                                             case value_type::number:
-                                                 return make_return(BinaryenBinary(mod, BinaryenEqFloat64(), BinaryenStructGet(mod, 0, exp, number_type(), false), BinaryenStructGet(mod, 0, exp_right, number_type(), false)));
-                                             case value_type::table:
-                                             case value_type::function:
-                                             case value_type::thread:
-                                                 return BinaryenRefEq(mod, exp, exp_right);
-
-                                             case value_type::string:
-                                             {
-                                                 auto string_t = type<value_type::string>();
-                                                 auto i        = vars.size() + std::size(params);
-                                                 vars.push_back(size_type());
-                                                 auto exp_i = vars.size() + std::size(params);
-                                                 vars.push_back(string_t);
-                                                 auto exp_right_i = vars.size() + std::size(params);
-                                                 vars.push_back(string_t);
-
-                                                 auto dec = [&](expr_ref first)
-                                                 {
-                                                     return BinaryenBinary(mod,
-                                                                           BinaryenSubInt32(),
-                                                                           first,
-                                                                           const_i32(1));
-                                                 };
-
-                                                 return make_return(
-                                                     make_if(
-                                                         BinaryenBinary(mod, BinaryenEqInt32(), local_tee(i, array_len(local_tee(exp_i, exp, string_t)), size_type()), array_len(local_tee(exp_right_i, exp_right, string_t))),
-                                                         BinaryenLoop(mod,
-                                                                      "+loop",
-                                                                      BinaryenIf(mod,
-                                                                                 local_get(i, size_type()),
-                                                                                 make_block(std::array{
-                                                                                     BinaryenBreak(mod,
-                                                                                                   "+loop",
-                                                                                                   BinaryenBinary(mod,
-                                                                                                                  BinaryenEqInt32(),
-                                                                                                                  array_get(local_get(exp_i, string_t), local_tee(i, dec(local_get(i, size_type())), size_type()), char_type()),
-                                                                                                                  array_get(local_get(exp_right_i, string_t), local_get(i, size_type()), char_type())),
-                                                                                                   nullptr),
-                                                                                     const_i32(0),
-                                                                                 }),
-                                                                                 const_i32(1))),
-
-                                                         const_i32(0)));
-                                             }
-                                             case value_type::nil:
-                                             case value_type::boolean:
-                                             case value_type::userdata:
-                                             default:
-                                                 return BinaryenUnreachable(mod);
-                                             }
-                                         }),
-                            nullptr,
-                            size_type());
-
-    return BinaryenAddFunction(mod,
-                               (std::string("*key_compare_") + name).c_str(),
-                               BinaryenTypeCreate(std::data(params), std::size(params)),
-                               size_type(),
-                               std::data(vars),
-                               std::size(vars),
-                               block);
+    return stack.add_function(("*key_compare_"s + type_name(vtype)).c_str(), size_type(), cmp);
 }
-
-
 
 build_return_t runtime::to_bool()
 {

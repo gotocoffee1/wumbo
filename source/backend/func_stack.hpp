@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <binaryen-c.h>
+#include <cassert>
 #include <optional>
 #include <string>
 #include <vector>

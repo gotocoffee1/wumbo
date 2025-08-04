@@ -1,5 +1,6 @@
 #pragma once
 
+#include "backend/func_stack.hpp"
 #include "backend/wasm_util.hpp"
 #include "binaryen-c.h"
 #include <cassert>
@@ -95,26 +96,6 @@ struct runtime : ext_types
     RUNTIME_FUNCTIONS(DECL_FUNCS)
 #undef DECL_FUNCS
 
-    BinaryenFunctionRef compare(const char* name, value_type vtype);
-
-    const func_sig& require(functions function);
-
-    auto call(functions function, expr_ref param)
-    {
-        auto& sig = require(function);
-        return make_call(sig.name,
-                         param,
-                         sig.return_type);
-    }
-
-    auto call(functions function, nonstd::span<const expr_ref> params)
-    {
-        auto& sig = require(function);
-        return make_call(sig.name,
-                         params,
-                         sig.return_type);
-    }
-
     struct function_stack
     {
         struct var
@@ -169,8 +150,22 @@ struct runtime : ext_types
             vars[pos].flags &= ~var::is_used;
         }
 
+        struct func_t
+        {
+            BinaryenModuleRef mod;
+            std::string name;
+            BinaryenType ret_type;
+
+            expr_ref operator()(nonstd::span<const expr_ref> param, bool return_call = false)
+            {
+                if (return_call)
+                    return BinaryenReturnCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
+                return BinaryenCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
+            }
+        };
+
         template<typename F>
-        auto add_function(const std::string& name, BinaryenType ret_type, F&& body)
+        func_t add_function(const std::string& name, BinaryenType ret_type, F&& body)
         {
             if (!BinaryenGetFunction(mod, name.c_str()))
             {
@@ -185,13 +180,7 @@ struct runtime : ext_types
                 for (size_t i = 0; i < vars.size(); ++i)
                     BinaryenFunctionSetLocalName(func, i, vars[i].name.c_str());
             }
-
-            return [=, mod = mod](nonstd::span<const expr_ref> param, bool return_call = false)
-            {
-                if (return_call)
-                    return BinaryenReturnCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
-                return BinaryenCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
-            };
+            return func_t{mod, name, ret_type};
         }
 
         BinaryenType type(size_t index)
@@ -215,6 +204,26 @@ struct runtime : ext_types
             return BinaryenLocalTee(mod, index, value, types[index]);
         }
     };
+
+    function_stack::func_t compare(value_type vtype);
+
+    const func_sig& require(functions function);
+
+    auto call(functions function, expr_ref param)
+    {
+        auto& sig = require(function);
+        return make_call(sig.name,
+                         param,
+                         sig.return_type);
+    }
+
+    auto call(functions function, nonstd::span<const expr_ref> params)
+    {
+        auto& sig = require(function);
+        return make_call(sig.name,
+                         params,
+                         sig.return_type);
+    }
 };
 
 } // namespace wumbo
