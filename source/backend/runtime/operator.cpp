@@ -1,7 +1,7 @@
 #include "runtime.hpp"
 
-#include "binaryen-c.h"
 #include "backend/wasm_util.hpp"
+#include "binaryen-c.h"
 
 #include <functional>
 
@@ -407,6 +407,7 @@ build_return_t runtime::len()
                                         case value_type::string:
                                             return make_return(new_integer(size_to_integer(array_len(exp))));
                                         case value_type::table:
+                                            return make_return(new_integer(size_to_integer(table::get<table::array_size>(*this, exp))));
                                         case value_type::userdata:
                                         {
                                             // TODO

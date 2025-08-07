@@ -9,6 +9,8 @@
 #define RUNTIME_FUNCTIONS(DO)                                                                   \
     DO(table_get, create_type(anyref(), anyref()), anyref())                                    \
     DO(table_set, create_type(anyref(), anyref(), anyref()), BinaryenTypeNone())                \
+    DO(table_create_array, ref_array_type(), get_type<table>())                                 \
+    DO(table_create_map, size_type(), get_type<table>())                                        \
     DO(to_bool, anyref(), bool_type())                                                          \
     DO(to_bool_not, anyref(), bool_type())                                                      \
     DO(logic_not, anyref(), anyref())                                                           \

@@ -340,13 +340,21 @@ struct runtime::tbl
             auto table = stack.alloc(self->type<value_type::table>(), "table");
             auto key   = stack.alloc(self->type(vtype), "key");
             stack.locals();
+            auto o = BinaryenNop(mod);
+            if (vtype == value_type::integer)
+            {
+                auto i     = stack.alloc(self->size_type(), "i");
+                auto tee_i = stack.tee(i, self->binop(BinaryenSubInt32(), self->integer_to_size(integer::get<integer::inner>(*self, stack.get(key))), self->const_i32(1)));
+                o          = self->make_if(self->binop(BinaryenLtUInt32(), tee_i, table::get<table::array_size>(*self, stack.get(table))), self->make_return(ref_array::get(*self, table::get<table::array>(*self, stack.get(table)), stack.get(i))));
+                stack.free_local(i);
+            }
 
-            size_t hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
-            size_t hash_value = stack.alloc(self->size_type(), "hash_value");
-            size_t dist       = stack.alloc(self->size_type(), "dist");
-            size_t pos        = stack.alloc(self->size_type(), "pos");
-            size_t ele_dist   = stack.alloc(self->size_type(), "ele_dist");
-            size_t ele        = stack.alloc(self->hash_entry_type(), "ele");
+            auto hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
+            auto hash_value = stack.alloc(self->size_type(), "hash_value");
+            auto dist       = stack.alloc(self->size_type(), "dist");
+            auto pos        = stack.alloc(self->size_type(), "pos");
+            auto ele_dist   = stack.alloc(self->size_type(), "ele_dist");
+            auto ele        = stack.alloc(self->hash_entry_type(), "ele");
 
             auto tee_hash_map   = stack.tee(hash_map, table::get<table::hash>(*self, stack.get(table)));
             auto tee_hash_value = stack.tee(hash_value, hash(self, vtype)(std::array{stack.get(key)}));
@@ -354,7 +362,7 @@ struct runtime::tbl
             auto get_distance_func = get_distance(self);
 
             auto body = std::array{
-
+                o,
                 stack.set(pos, calc_pos(self, self->array_len(tee_hash_map), tee_hash_value)),
 
                 BinaryenLoop(mod,
@@ -400,6 +408,34 @@ struct runtime::tbl
         return stack.add_function(("*table_get_"s + type_name(vtype)).c_str(), anyref(), get);
     }
 };
+
+build_return_t runtime::table_create_array()
+{
+    return {std::vector<BinaryenType>{},
+            make_block(std::array{
+                table::create(*this, std::array{
+                                         local_get(0, ref_array_type()),
+                                         hash_array::create_fixed(*this, std::array{null()}),
+                                         array_len(local_get(0, ref_array_type())),
+                                         const_i32(0),
+                                         null(),
+                                     }),
+            })};
+}
+
+build_return_t runtime::table_create_map()
+{
+    return {std::vector<BinaryenType>{},
+            make_block(std::array{
+                table::create(*this, std::array{
+                                         null(),
+                                         hash_array::create(*this, const_i32(1) /*local_get(0, size_type())*/),
+                                         const_i32(0),
+                                         const_i32(0),
+                                         null(),
+                                     }),
+            })};
+}
 
 build_return_t runtime::table_set()
 {
