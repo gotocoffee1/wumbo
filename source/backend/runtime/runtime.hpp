@@ -48,6 +48,7 @@
     DO(any_array_create, size_type(), ref_array_type())                                         \
     DO(any_array_get, create_type(ref_array_type(), size_type()), anyref())                     \
     DO(any_array_set, create_type(ref_array_type(), size_type(), anyref()), BinaryenTypeNone()) \
+    DO(open_table_lib, get_type<table>(), BinaryenTypeNone())                                   \
     DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 
 namespace wumbo
@@ -164,6 +165,13 @@ struct runtime : ext_types
                     return BinaryenReturnCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
                 return BinaryenCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
             }
+
+            expr_ref get_ref()
+            {
+                auto sig = BinaryenTypeFromHeapType(BinaryenFunctionGetType(BinaryenGetFunction(mod, name.c_str())), false);
+                return BinaryenRefFunc(mod, name.c_str(), sig);
+            }
+
         };
 
         template<typename F>
@@ -171,7 +179,7 @@ struct runtime : ext_types
         {
             if (!BinaryenGetFunction(mod, name.c_str()))
             {
-                auto b    = body();
+                auto b    = body(*this);
                 auto func = BinaryenAddFunction(mod,
                                                 name.c_str(),
                                                 BinaryenTypeCreate(std::data(types), var_index),
@@ -225,6 +233,24 @@ struct runtime : ext_types
         return make_call(sig.name,
                          params,
                          sig.return_type);
+    }
+
+    template<typename F>
+    auto add_lua_func(expr_ref tbl, const char* name, const std::vector<std::string>& args, bool vararg, F&& f)
+    {
+        function_stack stack{mod};
+        stack.alloc(ref_array_type(), "upvalues");
+        stack.alloc(ref_array_type(), "args");
+        stack.locals();
+
+        auto func = stack.add_function(name, ref_array_type(), std::forward<F>(f));
+
+        return call(functions::table_set,
+                    std::array{
+                        tbl,
+                        add_string(name),
+                        function::create(*this, std::array{func.get_ref()}),
+                    });
     }
 };
 

@@ -80,7 +80,7 @@ runtime::function_stack::func_t runtime::compare(value_type vtype)
 {
     runtime::function_stack stack{mod};
 
-    auto cmp = [&]()
+    auto cmp = [&](runtime::function_stack& stack)
     {
         auto first  = stack.alloc(type(vtype), "first");
         auto second = stack.alloc(anyref(), "second");

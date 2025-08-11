@@ -13,7 +13,7 @@ struct runtime::tbl
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function(("*hash_"s + type_name(vtype)).c_str(), self->size_type(), [&]()
+        return stack.add_function(("*hash_"s + type_name(vtype)).c_str(), self->size_type(), [&](runtime::function_stack& stack)
                                   {
                                       auto key = stack.alloc(self->type(vtype), "key");
                                       stack.locals();
@@ -98,7 +98,7 @@ struct runtime::tbl
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function("*get_distance", self->size_type(), [&]()
+        return stack.add_function("*get_distance", self->size_type(), [&](runtime::function_stack& stack)
                                   {
                                       auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
                                       auto element  = stack.alloc(self->get_type<hash_entry>(), "element");
@@ -121,7 +121,7 @@ struct runtime::tbl
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function("*map_insert_with_hint", BinaryenTypeNone(), [&]()
+        return stack.add_function("*map_insert_with_hint", BinaryenTypeNone(), [&](runtime::function_stack& stack)
                                   {
                                       auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
                                       auto new_ele  = stack.alloc(self->hash_entry_type(), "new_ele");
@@ -177,7 +177,7 @@ struct runtime::tbl
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function("*map_insert", BinaryenTypeNone(), [&]()
+        return stack.add_function("*map_insert", BinaryenTypeNone(), [&](runtime::function_stack& stack)
                                   {
                                       auto hash_map = stack.alloc(self->get_type<hash_array>(), "hash_map");
                                       auto new_ele  = stack.alloc(self->hash_entry_type(), "new_ele");
@@ -200,7 +200,7 @@ struct runtime::tbl
         auto mod = self->mod;
         runtime::function_stack stack{mod};
 
-        return stack.add_function("*map_grow", BinaryenTypeNone(), [&]()
+        return stack.add_function("*map_grow", BinaryenTypeNone(), [&](runtime::function_stack& stack)
                                   {
                                       auto tbl = stack.alloc(self->get_type<table>(), "table");
                                       stack.locals();
@@ -236,7 +236,7 @@ struct runtime::tbl
 
         runtime::function_stack stack{mod};
 
-        auto set = [&]()
+        auto set = [&](runtime::function_stack& stack)
         {
             auto table = stack.alloc(self->type<value_type::table>(), "table");
             auto key   = stack.alloc(self->type(vtype), "key");
@@ -335,7 +335,7 @@ struct runtime::tbl
 
         runtime::function_stack stack{mod};
 
-        auto get = [&]()
+        auto get = [&](runtime::function_stack& stack)
         {
             auto table = stack.alloc(self->type<value_type::table>(), "table");
             auto key   = stack.alloc(self->type(vtype), "key");
@@ -343,6 +343,7 @@ struct runtime::tbl
             auto o = BinaryenNop(mod);
             if (vtype == value_type::integer)
             {
+                // TODO check 0xFF00000001
                 auto i     = stack.alloc(self->size_type(), "i");
                 auto tee_i = stack.tee(i, self->binop(BinaryenSubInt32(), self->integer_to_size(integer::get<integer::inner>(*self, stack.get(key))), self->const_i32(1)));
                 o          = self->make_if(self->binop(BinaryenLtUInt32(), tee_i, table::get<table::array_size>(*self, stack.get(table))), self->make_return(ref_array::get(*self, table::get<table::array>(*self, stack.get(table)), stack.get(i))));

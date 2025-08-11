@@ -18,6 +18,7 @@ add_library(wumbo
   "source/lua2wasm.cpp"
   "source/backend/wasm.cpp"
   "source/backend/locals.cpp"
+  "source/backend/runtime/libs/table.cpp"
   "source/backend/runtime/runtime.cpp"
   "source/backend/runtime/operator.cpp"
   "source/backend/runtime/table.cpp"
