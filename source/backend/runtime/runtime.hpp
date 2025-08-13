@@ -171,7 +171,6 @@ struct runtime : ext_types
                 auto sig = BinaryenTypeFromHeapType(BinaryenFunctionGetType(BinaryenGetFunction(mod, name.c_str())), false);
                 return BinaryenRefFunc(mod, name.c_str(), sig);
             }
-
         };
 
         template<typename F>
@@ -235,21 +234,110 @@ struct runtime : ext_types
                          sig.return_type);
     }
 
-    template<typename F>
-    auto add_lua_func(expr_ref tbl, const char* name, const std::vector<std::string>& args, bool vararg, F&& f)
+    std::tuple<expr_ref_list, std::vector<size_t>> unpack_locals(function_stack& stack, nonstd::span<const char* const> p, expr_ref list)
+    {
+        size_t label_name              = 0;
+        std::string none               = "+none" + std::to_string(label_name++);
+        std::vector<const char*> names = {none.c_str()};
+        std::vector<size_t> vars;
+        expr_ref_list result;
+
+        if (p.empty())
+        {
+            return {result, vars};
+        }
+        for (auto arg : p)
+        {
+            names.push_back(arg);
+            vars.push_back(stack.alloc(anyref(), arg));
+        }
+        auto vararg = "...";
+
+        bool is_vararg = p.back() == std::string_view(vararg);
+        if (is_vararg)
+        {
+            p = p.first(p.size() - 1);
+            names.push_back(vararg);
+        }
+
+        std::array<expr_ref, 2> exp = {
+            BinaryenSwitch(mod,
+                           std::data(names),
+                           std::size(names) - 1,
+                           names.back(),
+                           array_len(BinaryenBrOn(mod,
+                                                  BinaryenBrOnNull(),
+                                                  names[0],
+                                                  list,
+                                                  BinaryenTypeNone())),
+                           nullptr),
+
+        };
+        if (is_vararg)
+        {
+            exp[0] = BinaryenBlock(mod, vararg, std::data(exp), 1, BinaryenTypeAuto());
+
+            auto new_array = stack.alloc(ref_array_type(), vararg);
+            vars.push_back(new_array);
+
+            auto size = stack.alloc(size_type(), "size");
+
+            auto calc_size = local_tee(size, BinaryenBinary(mod, BinaryenSubInt32(), array_len(list), const_i32(p.size())), size_type());
+            exp[1]         = BinaryenArrayCopy(mod,
+                                       stack.tee(new_array,
+                                                 BinaryenArrayNew(mod,
+                                                                  BinaryenTypeGetHeapType(ref_array_type()),
+                                                                  calc_size,
+                                                                  nullptr)),
+                                       const_i32(0),
+                                       list,
+                                       const_i32(p.size()),
+                                       local_get(size, size_type()));
+            stack.free_local(size);
+        }
+
+        bool first = !is_vararg;
+        size_t j   = p.size();
+        for (auto iter = p.rbegin(); iter != p.rend(); ++iter)
+        {
+            j--;
+            exp[0] = BinaryenBlock(mod, *iter, std::data(exp), first ? 1 : std::size(exp), BinaryenTypeAuto());
+            first  = false;
+
+            auto get = array_get(
+                list,
+                const_i32(j),
+                anyref());
+
+            exp[1] = stack.set(vars[j], get);
+        }
+
+        result.push_back(make_block(exp, names[0]));
+        return {result, vars};
+    }
+
+    template<typename F, size_t N>
+    auto add_lua_func(expr_ref tbl, const char* name, const std::array<const char*, N>& arg_names, F&& f)
     {
         function_stack stack{mod};
-        stack.alloc(ref_array_type(), "upvalues");
-        stack.alloc(ref_array_type(), "args");
-        stack.locals();
 
-        auto func = stack.add_function(name, ref_array_type(), std::forward<F>(f));
+        auto func = stack.add_function(name, ref_array_type(), [&](function_stack& stack)
+                                       {
+                                           stack.alloc(ref_array_type(), "upvalues");
+                                           auto args = stack.alloc(ref_array_type(), "args");
+                                           stack.locals();
+                                           auto [result, vars] = unpack_locals(stack, arg_names, stack.get(args));
+                                           std::array<size_t, N> vars_array;
+                                           std::copy(vars.begin(), vars.end(), vars_array.begin());
+                                           result.push_back(f(stack, vars_array));
+                                           return make_block(result);
+                                       });
 
         return call(functions::table_set,
                     std::array{
                         tbl,
                         add_string(name),
-                        function::create(*this, std::array{func.get_ref()}),
+                        function::create(*this, std::array{func.get_ref(), null()}),
                     });
     }
 };
