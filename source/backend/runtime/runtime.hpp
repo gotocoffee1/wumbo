@@ -48,7 +48,15 @@
     DO(any_array_create, size_type(), ref_array_type())                                         \
     DO(any_array_get, create_type(ref_array_type(), size_type()), anyref())                     \
     DO(any_array_set, create_type(ref_array_type(), size_type(), anyref()), BinaryenTypeNone()) \
-    DO(open_table_lib, get_type<table>(), BinaryenTypeNone())                                   \
+    DO(open_basic_lib, get_type<table>(), get_type<table>())                                    \
+    DO(open_coroutine_lib, get_type<table>(), get_type<table>())                                \
+    DO(open_table_lib, get_type<table>(), get_type<table>())                                    \
+    DO(open_io_lib, get_type<table>(), get_type<table>())                                       \
+    DO(open_os_lib, get_type<table>(), get_type<table>())                                       \
+    DO(open_string_lib, get_type<table>(), get_type<table>())                                   \
+    DO(open_math_lib, get_type<table>(), get_type<table>())                                     \
+    DO(open_utf8_lib, get_type<table>(), get_type<table>())                                     \
+    DO(open_debug_lib, get_type<table>(), get_type<table>())                                    \
     DO(invoke, create_type(anyref(), ref_array_type()), ref_array_type())
 
 namespace wumbo

@@ -490,9 +490,6 @@ struct compiler : ext_types
 
     expr_ref call(expr_ref func, expr_ref args);
 
-    expr_ref_list open_basic_lib();
-    expr_ref_list setup_env();
-
     expr_ref operator()(const bin_operation& p);
 
     expr_ref operator()(const un_operation& p);
@@ -516,17 +513,44 @@ struct compiler : ext_types
         return result;
     }
 
+    expr_ref_list setup_env()
+    {
+        local_variables vars;
+        vars.names.push_back("_ENV");
+        vars.explist.emplace_back().inner = table_constructor{};
+        auto& usage                       = vars.usage.emplace_back();
+        usage.upvalue                     = true;
+        usage.read_count                  = 1;
+        usage.write_count                 = 0;
+
+        return (*this)(vars);
+
+        // todo:
+        //local _ENV = {}
+        //_ENV._G = _ENV
+    }
+
     auto convert(const block& chunk)
     {
         function_frame frame{_func_stack, 1, std::nullopt};
 
         auto env = setup_env();
 
-        append(env, open_basic_lib());
+        append(env, std::array{
+                        drop(_runtime.call(functions::open_basic_lib, std::array{BinaryenRefCast(mod, get_var("_ENV"), type<value_type::table>())})),
+                        set_var("coroutine", _runtime.call(functions::open_coroutine_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(7)})})),
+                        set_var("table", _runtime.call(functions::open_table_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(7)})})),
+                        set_var("io", _runtime.call(functions::open_io_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(11)})})),
+                        set_var("os", _runtime.call(functions::open_os_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(11)})})),
+                        set_var("string", _runtime.call(functions::open_string_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(17)})})),
+                        set_var("math", _runtime.call(functions::open_math_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(27)})})),
+                        set_var("utf8", _runtime.call(functions::open_utf8_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(6)})})),
+                        set_var("debug", _runtime.call(functions::open_debug_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(17)})})),
+                    });
 
         auto init = add_func_ref("*init", chunk, {}, {}, true);
         BinaryenAddFunctionExport(mod, "*init", "init");
-
+        // call init function with ... args
         env.push_back(call(init, local_get(0, ref_array_type())));
 
         export_func(_runtime.require(functions::get_type_num).name);

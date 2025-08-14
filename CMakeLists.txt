@@ -18,7 +18,15 @@ add_library(wumbo
   "source/lua2wasm.cpp"
   "source/backend/wasm.cpp"
   "source/backend/locals.cpp"
+  "source/backend/runtime/libs/basic.cpp"
+  "source/backend/runtime/libs/coroutine.cpp"
+  "source/backend/runtime/libs/debug.cpp"
+  "source/backend/runtime/libs/io.cpp"
+  "source/backend/runtime/libs/math.cpp"
+  "source/backend/runtime/libs/os.cpp"
+  "source/backend/runtime/libs/string.cpp"
   "source/backend/runtime/libs/table.cpp"
+  "source/backend/runtime/libs/utf8.cpp"
   "source/backend/runtime/runtime.cpp"
   "source/backend/runtime/operator.cpp"
   "source/backend/runtime/table.cpp"
@@ -26,7 +34,6 @@ add_library(wumbo
   "source/backend/expression.cpp"
   "source/backend/table.cpp"
   "source/backend/loop.cpp"
-  "source/backend/basic_lib.cpp"
   "source/backend/operators.cpp")
 
 add_library(wumbo::wumbo ALIAS wumbo)

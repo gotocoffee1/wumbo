@@ -3,7 +3,7 @@
 namespace wumbo
 {
 
-build_return_t runtime::open_table_lib()
+build_return_t runtime::open_string_lib()
 {
     expr_ref_list result;
     auto add_func = [&](const char* name, auto&& args, auto&& f)

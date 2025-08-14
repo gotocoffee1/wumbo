@@ -1,39 +1,35 @@
-#include "ast/ast.hpp"
-#include "backend/wasm_util.hpp"
-#include "binaryen-c.h"
-#include "compiler.hpp"
-#include "runtime/runtime.hpp"
-#include <array>
+#include "../runtime.hpp"
 
 namespace wumbo
 {
 
-expr_ref_list compiler::open_basic_lib()
+build_return_t runtime::open_basic_lib()
 {
+    expr_ref_list result;
+    auto add_func = [&](const char* name, auto&& args, auto&& f)
+    {
+        result.push_back(add_lua_func(local_get(0, get_type<table>()), name, args, f));
+    };
+
     BinaryenAddFunctionImport(mod, "stdout", "native", "stdout", BinaryenTypeExternref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "load_lua", "load", "load", BinaryenTypeExternref(), lua_func());
 
-    expr_ref_list result;
+    // add_func("assert", std::array{"v" /*, "message"*/}, [this](runtime::function_stack& stack, auto&& vars)
+    //          {
+    //              auto [v] = vars;
 
-    auto add_func = [&](const char* name, const name_list& args, bool vararg, auto&& f)
-    {
-        std::vector<local_usage> usage;
-        usage.resize(args.size());
-        result.push_back(set_var(name, add_func_ref(name, args, usage, vararg, f)));
-    };
-
-    add_func("assert", {"v" /*, "message"*/}, false, [this]()
+    //              auto alt = [&]()
+    //              {
+    //                  return add_string("assertion failed!");
+    //              };
+    //              return make_if(call(functions::to_bool, stack.get(v), make_return(local_get(args_index, ref_array_type())), throw_error(at_or_null(args_index, 1, nullptr, alt))));
+    //          });
+    add_func("collectgarbage", std::array{"opt", "arg"}, [this](runtime::function_stack& stack, auto&& vars)
              {
-                 auto alt = [&]()
-                 {
-                     return add_string("assertion failed!");
-                 };
-                 return std::array{make_if(_runtime.call(functions::to_bool, get_var("v")), make_return(local_get(args_index, ref_array_type())), throw_error(at_or_null(args_index, 1, nullptr, alt)))};
+                 auto [opt, arg] = vars;
+                 return null();
              });
-    add_func("collectgarbage", {"opt", "arg"}, false, [this]()
-             {
-                 return std::array{BinaryenNop(mod)};
-             });
+    /*
     add_func("dofile", {"filename"}, false, [this]()
              {
                  return std::array{BinaryenUnreachable(mod)};
@@ -232,24 +228,10 @@ expr_ref_list compiler::open_basic_lib()
                                      });
              });
     add_func("xpcall", {"f", "msgh"}, true, make_pcall(true));
-    return result;
-}
+*/
+    result.push_back(local_get(0, get_type<table>()));
 
-expr_ref_list compiler::setup_env()
-{
-    local_variables vars;
-    vars.names.push_back("_ENV");
-    vars.explist.emplace_back().inner = table_constructor{};
-    auto& usage                       = vars.usage.emplace_back();
-    usage.upvalue                     = true;
-    usage.read_count                  = 1;
-    usage.write_count                 = 0;
-
-    return (*this)(vars);
-
-    // todo:
-    //local _ENV = {}
-    //_ENV._G = _ENV
+    return {std::vector<BinaryenType>{}, make_block(result)};
 }
 
 } // namespace wumbo
