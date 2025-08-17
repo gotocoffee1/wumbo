@@ -324,6 +324,18 @@ struct runtime : ext_types
         return {result, vars};
     }
 
+    struct lua_std_func_t
+    {
+        runtime& self;
+        expr_ref_list result;
+
+        template<typename F, size_t N>
+        void operator()(const char* name, const std::array<const char*, N>& args, F&& f)
+        {
+            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), name, args, std::forward<F>(f)));
+        }
+    };
+
     template<typename F, size_t N>
     auto add_lua_func(expr_ref tbl, const char* name, const std::array<const char*, N>& arg_names, F&& f)
     {
@@ -337,7 +349,7 @@ struct runtime : ext_types
                                            auto [result, vars] = unpack_locals(stack, arg_names, stack.get(args));
                                            std::array<size_t, N> vars_array;
                                            std::copy(vars.begin(), vars.end(), vars_array.begin());
-                                           result.push_back(f(stack, vars_array));
+                                           append(result, f(stack, vars_array));
                                            return make_block(result);
                                        });
 

@@ -5,16 +5,11 @@ namespace wumbo
 
 build_return_t runtime::open_basic_lib()
 {
-    expr_ref_list result;
-    auto add_func = [&](const char* name, auto&& args, auto&& f)
-    {
-        result.push_back(add_lua_func(local_get(0, get_type<table>()), name, args, f));
-    };
-
+    lua_std_func_t std{*this};
     BinaryenAddFunctionImport(mod, "stdout", "native", "stdout", BinaryenTypeExternref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "load_lua", "load", "load", BinaryenTypeExternref(), lua_func());
 
-    // add_func("assert", std::array{"v" /*, "message"*/}, [this](runtime::function_stack& stack, auto&& vars)
+    // std("assert", std::arraystd::array{"v" /*, "message"*/}, [this](runtime::function_stack& stack, auto&& vars)
     //          {
     //              auto [v] = vars;
 
@@ -24,29 +19,31 @@ build_return_t runtime::open_basic_lib()
     //              };
     //              return make_if(call(functions::to_bool, stack.get(v), make_return(local_get(args_index, ref_array_type())), throw_error(at_or_null(args_index, 1, nullptr, alt))));
     //          });
-    add_func("collectgarbage", std::array{"opt", "arg"}, [this](runtime::function_stack& stack, auto&& vars)
-             {
-                 auto [opt, arg] = vars;
-                 return null();
-             });
+    std("collectgarbage", std::array{"opt", "arg"}, [this](function_stack& stack, auto&& vars)
+        {
+            auto [opt, arg] = vars;
+            return null();
+        });
+
+    std("dofile", std::array{"filename"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("error", std::array{"message", "level"}, [this](function_stack& stack, auto&& vars)
+        {
+            auto [message, level] = vars;
+            return throw_error(stack.get(message));
+        });
+    std("getmetatable", std::array{"object"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("ipairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
     /*
-    add_func("dofile", {"filename"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("error", {"message", "level"}, false, [this]()
-             {
-                 return std::array{throw_error(get_var("message"))};
-             });
-    add_func("getmetatable", {"object"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("ipairs", {"t"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("load", {"chunk", "chunkname", "mode", "env"}, false, [&]()
+    std("load", std::array{"chunk", "chunkname", "mode", "env"}, false, [&]()
              {
                  auto chunk = get_var("chunk");
 
@@ -70,24 +67,25 @@ build_return_t runtime::open_basic_lib()
                                          }
                                          return exp ? make_return(make_ref_array(exp)) : make_return(null());
                                      });
-             });
-    add_func("loadfile", {"filename ", "mode", "env"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("next", {"table", "index"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("pairs", {"t"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-
+             });*/
+    std("loadfile", std::array{"filename ", "mode", "env"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("next", std::array{"table", "index"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("pairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    /*
     auto make_pcall = [this](bool x)
     {
-        return [this, x]()
+        return [this, x](function_stack& stack, auto&& vars)
         {
+            
             auto f = get_var("f");
 
             auto args = (*this)(ellipsis{});
@@ -120,118 +118,120 @@ build_return_t runtime::open_basic_lib()
         };
     };
 
-    add_func("pcall", {"f"}, true, make_pcall(false));
-    add_func("print", {}, true, [this]()
-             {
-                 auto exp = (*this)(ellipsis{});
+    std("pcall", std::array{"f", "..."}, make_pcall(false));*/
+    std("print", std::array{"..."}, [this](function_stack& stack, auto&& vars)
+        {
+            auto [vaarg] = vars;
 
-                 exp = array_get(exp, const_i32(0), anyref());
-                 exp = _runtime.call(functions::to_string, exp);
-                 exp = _runtime.call(functions::lua_str_to_js_array, exp);
+            auto exp = array_get(stack.get(vaarg), const_i32(0), anyref());
+            exp      = call(functions::to_string, exp);
+            exp      = call(functions::lua_str_to_js_array, exp);
 
-                 return std::array{
-                     make_call("stdout", exp, BinaryenTypeNone()),
-                     make_call("stdout", _runtime.call(functions::lua_str_to_js_array, add_string("\n")), BinaryenTypeNone()),
-                     make_return(null()),
-                 };
-             });
-    add_func("rawequal", {"v1", "v2"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("rawget", {"table", "index"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("rawlen", {"v"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("rawset", {"table", "index", "value"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("select", {"index"}, true, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("setmetatable", {"table", "metatable"}, false, [this]()
-             {
-                 return std::array{BinaryenUnreachable(mod)};
-             });
-    add_func("tonumber", {"e", "base"}, false, [this]()
-             {
-                 auto e = get_var("e");
-                 e      = _runtime.call(functions::to_number, e);
-                 return std::array{make_return(make_ref_array(e))};
-             });
-    add_func("tostring", {"v"}, false, [this]()
-             {
-                 auto exp = _runtime.call(functions::to_string, get_var("v"));
-                 return std::array{make_return(make_ref_array(exp))};
-             });
-    add_func("type", {"v"}, false, [this]()
-             {
-                 auto v = get_var("v");
+            return std::array{
+                make_call("stdout", exp, BinaryenTypeNone()),
+                make_call("stdout", call(functions::lua_str_to_js_array, add_string("\n")), BinaryenTypeNone()),
+                make_return(null()),
+            };
+        });
+    std("rawequal", std::array{"v1", "v2"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("rawget", std::array{"table", "index"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("rawlen", std::array{"v"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("rawset", std::array{"table", "index", "value"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("select", std::array{"index", "..."}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("setmetatable", std::array{"table", "metatable"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("tonumber", std::array{"e", "base"}, [this](function_stack& stack, auto&& vars)
+        {
+            auto [e, base] = vars;
+            auto num       = call(functions::to_number, stack.get(e));
+            return make_return(ref_array::create_fixed(*this, num));
+        });
+    std("tostring", std::array{"v"}, [this](function_stack& stack, auto&& vars)
+        {
+            auto [v] = vars;
 
-                 auto casts = std::array{
-                     value_type::boolean,
-                     value_type::number,
-                     value_type::integer,
-                     value_type::string,
-                     value_type::function,
-                     value_type::table,
-                     value_type::userdata,
-                     value_type::thread,
-                 };
+            auto exp = call(functions::to_string, stack.get(v));
+            return make_return(ref_array::create_fixed(*this, exp));
+        });
+    std("type", std::array{"v"}, [this](function_stack& stack, auto&& vars)
+        {
+            auto [v] = vars;
 
-                 return switch_value(v, casts, [&](value_type type, expr_ref exp)
-                                     {
-                                         const char* str;
-                                         switch (type)
-                                         {
-                                         case value_type::nil:
-                                             str = "nil";
-                                             break;
-                                         case value_type::boolean:
-                                             str = "boolean";
-                                             break;
-                                         case value_type::integer:
-                                         case value_type::number:
-                                             str = "number";
-                                             break;
-                                         case value_type::string:
-                                             str = "string";
-                                             break;
-                                         case value_type::function:
-                                             str = "function";
-                                             break;
-                                         case value_type::userdata:
-                                             str = "userdata";
-                                             break;
-                                         case value_type::thread:
-                                             str = "thread";
-                                             break;
-                                         case value_type::table:
-                                             str = "table";
-                                             break;
-                                         default:
-                                             return BinaryenUnreachable(mod);
-                                         }
+            auto casts = std::array{
+                value_type::boolean,
+                value_type::number,
+                value_type::integer,
+                value_type::string,
+                value_type::function,
+                value_type::table,
+                value_type::userdata,
+                value_type::thread,
+            };
 
-                                         auto ret = make_return(make_ref_array(add_string(str)));
-                                         return exp ? make_block(std::array{
-                                                          drop(exp),
-                                                          ret,
-                                                      })
-                                                    : ret;
-                                     });
-             });
-    add_func("xpcall", {"f", "msgh"}, true, make_pcall(true));
-*/
-    result.push_back(local_get(0, get_type<table>()));
+            return switch_value(stack.get(v), casts, [&](value_type type, expr_ref exp)
+                                {
+                                    const char* str;
+                                    switch (type)
+                                    {
+                                    case value_type::nil:
+                                        str = "nil";
+                                        break;
+                                    case value_type::boolean:
+                                        str = "boolean";
+                                        break;
+                                    case value_type::integer:
+                                    case value_type::number:
+                                        str = "number";
+                                        break;
+                                    case value_type::string:
+                                        str = "string";
+                                        break;
+                                    case value_type::function:
+                                        str = "function";
+                                        break;
+                                    case value_type::userdata:
+                                        str = "userdata";
+                                        break;
+                                    case value_type::thread:
+                                        str = "thread";
+                                        break;
+                                    case value_type::table:
+                                        str = "table";
+                                        break;
+                                    default:
+                                        return BinaryenUnreachable(mod);
+                                    }
 
-    return {std::vector<BinaryenType>{}, make_block(result)};
+                                    auto ret = make_return(ref_array::create_fixed(*this, add_string(str)));
+                                    return exp ? make_block(std::array{
+                                                     drop(exp),
+                                                     ret,
+                                                 })
+                                               : ret;
+                                });
+        });
+    // std("xpcall", std::array{"f", "msgh", "..."}, make_pcall(true));
+
+    std.result.push_back(local_get(0, get_type<table>()));
+
+    return {std::vector<BinaryenType>{}, make_block(std.result)};
 }
 
 } // namespace wumbo

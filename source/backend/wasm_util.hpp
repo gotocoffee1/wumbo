@@ -84,6 +84,20 @@ std::vector<T> append(std::vector<T>&& self, U&& other)
     return std::move(self);
 }
 
+template<typename T>
+std::vector<T>& append(std::vector<T>& self, T&& other)
+{
+    self.push_back(std::forward<T>(other));
+    return self;
+}
+
+template<typename T>
+std::vector<T> append(std::vector<T>&& self, T&& other)
+{
+    self.push_back(std::forward<T>(other));
+    return std::move(self);
+}
+
 struct utils
 {
     BinaryenModuleRef mod;
@@ -577,6 +591,10 @@ struct ext_types : utils
         static expr_ref create_fixed(ext_types& self, nonstd::span<const expr_ref> values)
         {
             return BinaryenArrayNewFixed(self.mod, BinaryenTypeGetHeapType(self.get_type<Self>()), const_cast<expr_ref*>(values.data()), values.size());
+        }
+        static expr_ref create_fixed(ext_types& self, expr_ref value)
+        {
+            return BinaryenArrayNewFixed(self.mod, BinaryenTypeGetHeapType(self.get_type<Self>()), &value, 1);
         }
 
         static expr_ref get(ext_types& self, expr_ref array, expr_ref index, bool is_signed = false)
