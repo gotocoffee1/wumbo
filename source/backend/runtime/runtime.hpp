@@ -254,17 +254,20 @@ struct runtime : ext_types
         {
             return {result, vars};
         }
+        auto vararg    = "...";
+        bool is_vararg = p.back() == std::string_view(vararg);
+        if (is_vararg)
+        {
+            p = p.first(p.size() - 1);
+        }
         for (auto arg : p)
         {
             names.push_back(arg);
             vars.push_back(stack.alloc(anyref(), arg));
         }
-        auto vararg = "...";
 
-        bool is_vararg = p.back() == std::string_view(vararg);
         if (is_vararg)
         {
-            p = p.first(p.size() - 1);
             names.push_back(vararg);
         }
 
@@ -322,6 +325,61 @@ struct runtime : ext_types
 
         result.push_back(make_block(exp, names[0]));
         return {result, vars};
+    }
+
+    expr_ref make_ref_array(function_stack& stack, nonstd::span<const expr_ref> p)
+    {
+        if (p.empty())
+            return null();
+        expr_ref_list result;
+        size_t i = 0;
+        for (auto exp : p)
+        {
+            i++;
+            auto type = BinaryenExpressionGetType(exp);
+            if (type == ref_array_type())
+            {
+                if (p.size() == 1)
+                    return exp;
+
+                auto local = stack.alloc(type, "i");
+
+                auto l_get = local_get(local, type);
+                exp        = BinaryenLocalTee(mod, local, exp, type);
+                if (i == p.size())
+                {
+                    auto new_array = stack.alloc(type, "new_array");
+
+                    expr_ref_list copy;
+                    copy.push_back(resize_array(new_array, type, l_get, const_i32(result.size()), true));
+
+                    size_t j = 0;
+                    for (auto& init : result)
+                        copy.push_back(BinaryenArraySet(mod, local_get(new_array, type), const_i32(j++), init));
+
+                    copy.push_back(local_get(new_array, type));
+
+                    result.push_back(null());
+                    return BinaryenIf(mod,
+                                      BinaryenRefIsNull(mod, exp),
+                                      BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result)),
+                                      BinaryenBlock(mod, "", std::data(copy), std::size(copy), type));
+                }
+                else
+                {
+                    exp = BinaryenIf(mod,
+                                     BinaryenRefIsNull(mod, exp),
+                                     null(),
+                                     BinaryenArrayGet(mod, l_get, const_i32(0), anyref(), false));
+
+                    result.push_back(exp);
+                }
+            }
+            else
+                result.push_back(exp);
+        }
+
+        return BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
     }
 
     struct lua_std_func_t

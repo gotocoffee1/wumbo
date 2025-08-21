@@ -76,59 +76,69 @@ build_return_t runtime::open_basic_lib()
         {
             return BinaryenUnreachable(mod);
         });
-    std("pairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
-        {
-            return BinaryenUnreachable(mod);
-        });
-    /*
+    // std("pairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
+    //     {
+    //         return BinaryenUnreachable(mod);
+    //     });
+
     auto make_pcall = [this](bool x)
     {
         return [this, x](function_stack& stack, auto&& vars)
         {
-            
-            auto f = get_var("f");
+            auto f = vars[0];
 
-            auto args = (*this)(ellipsis{});
+            auto args = vars[1 + x];
 
-            auto exception = help_var_scope{_func_stack, anyref()};
+            auto exception = stack.alloc(anyref(), "exception");
 
             const char* tags[] = {error_tag};
             expr_ref catches[] = {
                 x ? make_block(std::array{
-                        local_set(exception, BinaryenPop(mod, anyref())),
-                        drop(call(get_var("msgh"), make_ref_array(local_get(exception, anyref())))),
-                        make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                        stack.set(exception, BinaryenPop(mod, anyref())),
+                        drop(call(functions::invoke, std::array{stack.get(vars[1]), ref_array::create_fixed(*this, stack.get(exception))})),
+                        make_return(make_ref_array(stack, std::array{new_boolean(const_boolean(false)), stack.get(exception)})),
                     })
                   : make_block(std::array{
-                        local_set(exception, BinaryenPop(mod, anyref())),
-                        make_return(make_ref_array({new_boolean(const_boolean(false)), local_get(exception, anyref())})),
+                        stack.set(exception, BinaryenPop(mod, anyref())),
+                        make_return(make_ref_array(stack, std::array{new_boolean(const_boolean(false)), stack.get(exception)})),
                     }),
             };
 
             auto try_ = BinaryenTry(mod,
                                     nullptr,
-                                    make_return(make_ref_array({new_boolean(const_boolean(true)), call(f, args)})),
+                                    make_return(make_ref_array(stack, std::array{new_boolean(const_boolean(true)), call(functions::invoke, std::array{stack.get(f), stack.get(args)})})),
                                     std::data(tags),
                                     std::size(tags),
                                     std::data(catches),
                                     std::size(catches),
                                     nullptr);
 
-            return std::array{try_};
+            return try_;
         };
     };
 
-    std("pcall", std::array{"f", "..."}, make_pcall(false));*/
+    std("pcall", std::array{"f", "..."}, make_pcall(false));
+
     std("print", std::array{"..."}, [this](function_stack& stack, auto&& vars)
         {
             auto [vaarg] = vars;
+            auto i       = stack.alloc(size_type(), "i");
 
-            auto exp = array_get(stack.get(vaarg), const_i32(0), anyref());
+            auto exp = array_get(stack.get(vaarg), stack.get(i), anyref());
             exp      = call(functions::to_string, exp);
             exp      = call(functions::lua_str_to_js_array, exp);
+            exp      = make_call("stdout", exp, BinaryenTypeNone());
+            exp = BinaryenLoop(mod,
+                               "+loop",
+                               make_if(binop(BinaryenLtUInt32(), stack.get(i), array_len(stack.get(vaarg))),
+                                       make_block(std::array{
+                                           exp,
+                                           stack.set(i, binop(BinaryenAddInt32(), stack.get(i), const_i32(1))),
+                                           BinaryenBreak(mod, "+loop", nullptr, nullptr),
+                                       })));
 
             return std::array{
-                make_call("stdout", exp, BinaryenTypeNone()),
+                exp,
                 make_call("stdout", call(functions::lua_str_to_js_array, add_string("\n")), BinaryenTypeNone()),
                 make_return(null()),
             };

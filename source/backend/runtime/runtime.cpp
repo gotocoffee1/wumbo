@@ -136,14 +136,14 @@ runtime::function_stack::func_t runtime::compare(value_type vtype)
                                                                          BinaryenBreak(mod,
                                                                                        "+loop",
                                                                                        binop(BinaryenEqInt32(),
-                                                                                              string::get(*this, stack.get(exp_i), stack.tee(i, dec(stack.get(i)))),
+                                                                                             string::get(*this, stack.get(exp_i), stack.tee(i, dec(stack.get(i)))),
                                                                                              string::get(*this, stack.get(exp_right_i), stack.get(i))),
                                                                                        nullptr),
                                                                          const_i32(0),
                                                                      }),
                                                                      const_i32(1))),
 
-                                              const_i32(0)));
+                                             const_i32(0)));
                              }
                              case value_type::nil:
                              case value_type::boolean:
@@ -205,6 +205,7 @@ build_return_t runtime::to_string()
     import_func("num_to_str", number_type(), BinaryenTypeExternref(), "native", "toString");
     auto casts = std::array{
         value_type::string,
+        value_type::boolean,
         value_type::number,
         value_type::integer,
     };
@@ -215,6 +216,9 @@ build_return_t runtime::to_string()
                                         {
                                         case value_type::nil:
                                             exp = add_string("nil");
+                                            break;
+                                        case value_type::boolean:
+                                            exp = make_if(BinaryenI31Get(mod, exp, false), add_string("true"), add_string("false"));
                                             break;
                                         case value_type::string:
                                             break;
