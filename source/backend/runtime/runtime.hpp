@@ -344,42 +344,41 @@ struct runtime : ext_types
 
                 auto local = stack.alloc(type, "i");
 
-                auto l_get = local_get(local, type);
-                exp        = BinaryenLocalTee(mod, local, exp, type);
+                exp = stack.tee(local, exp);
                 if (i == p.size())
                 {
                     auto new_array = stack.alloc(type, "new_array");
 
                     expr_ref_list copy;
-                    copy.push_back(resize_array(new_array, type, l_get, const_i32(result.size()), true));
+                    copy.push_back(resize_array(new_array, type, stack.get(local), const_i32(result.size()), true));
 
                     size_t j = 0;
                     for (auto& init : result)
-                        copy.push_back(BinaryenArraySet(mod, local_get(new_array, type), const_i32(j++), init));
+                        copy.push_back(ref_array::set(*this, local_get(new_array, type), const_i32(j++), init));
 
                     copy.push_back(local_get(new_array, type));
 
                     result.push_back(null());
-                    return BinaryenIf(mod,
-                                      BinaryenRefIsNull(mod, exp),
-                                      BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result)),
-                                      BinaryenBlock(mod, "", std::data(copy), std::size(copy), type));
+                    stack.free_local(new_array);
+                    stack.free_local(local);
+                    return make_if(BinaryenRefIsNull(mod, exp),
+                                   ref_array::create_fixed(*this, result),
+                                   make_block(copy, "", type));
                 }
                 else
                 {
-                    exp = BinaryenIf(mod,
-                                     BinaryenRefIsNull(mod, exp),
-                                     null(),
-                                     BinaryenArrayGet(mod, l_get, const_i32(0), anyref(), false));
+                    exp = make_if(BinaryenRefIsNull(mod, exp),
+                                  null(),
+                                  ref_array::get(*this, stack.get(local), const_i32(0)));
 
                     result.push_back(exp);
                 }
+                stack.free_local(local);
             }
             else
                 result.push_back(exp);
         }
-
-        return BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(result), std::size(result));
+        return ref_array::create_fixed(*this, result);
     }
 
     struct lua_std_func_t

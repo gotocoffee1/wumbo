@@ -460,6 +460,28 @@ struct ext_types : utils
         };
     }
 
+    expr_ref loop(size_t i, size_t max, expr_ref body, expr_ref init_i = nullptr, expr_ref init_max = nullptr)
+    {
+        return make_if(binop(BinaryenLtUInt32(),
+                             init_i ? local_tee(i, init_i, size_type()) : local_get(i, size_type()),
+                             init_max ? local_tee(max, init_max, size_type()) : local_get(max, size_type())),
+                       BinaryenLoop(mod,
+                                    "+loop",
+                                    make_block(std::array{
+                                        body,
+                                        BinaryenBreak(mod,
+                                                      "+loop",
+                                                      binop(BinaryenLtUInt32(),
+                                                            local_tee(i,
+                                                                      binop(BinaryenAddInt32(),
+                                                                            local_get(i, size_type()),
+                                                                            const_i32(1)),
+                                                                      size_type()),
+                                                            local_get(max, size_type())),
+                                                      nullptr),
+                                    })));
+    }
+
     BinaryenType ref_array_type() const
     {
         return types[0];

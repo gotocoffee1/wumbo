@@ -42,22 +42,22 @@ build_return_t runtime::open_basic_lib()
         {
             return BinaryenUnreachable(mod);
         });
-    /*
-    std("load", std::array{"chunk", "chunkname", "mode", "env"}, false, [&]()
+    
+    std("load", std::array{"chunk", "chunkname", "mode", "env"}, [this](function_stack& stack, auto&& vars)
              {
-                 auto chunk = get_var("chunk");
+                auto [chunk, chunkname, mode, env] = vars;
 
                  auto casts = std::array{
                      value_type::string,
                      //value_type::function,
                  };
 
-                 return switch_value(chunk, casts, [this](value_type type, expr_ref exp)
+                 return switch_value(stack.get(chunk), casts, [&](value_type type, expr_ref exp)
                                      {
                                          switch (type)
                                          {
                                          case value_type::string:
-                                             exp = _runtime.call(functions::lua_str_to_js_array, exp);
+                                             exp = call(functions::lua_str_to_js_array, exp);
                                              exp = make_call("load_lua", exp, lua_func());
                                              exp = build_closure(exp, {get_var("_ENV")});
                                              break;
@@ -65,17 +65,17 @@ build_return_t runtime::open_basic_lib()
                                          default:
                                              return BinaryenUnreachable(mod);
                                          }
-                                         return exp ? make_return(make_ref_array(exp)) : make_return(null());
+                                         return exp ? make_return(make_ref_array(stack, std::array{exp})) : make_return(null());
                                      });
-             });*/
-    std("loadfile", std::array{"filename ", "mode", "env"}, [this](function_stack& stack, auto&& vars)
-        {
-            return BinaryenUnreachable(mod);
-        });
-    std("next", std::array{"table", "index"}, [this](function_stack& stack, auto&& vars)
-        {
-            return BinaryenUnreachable(mod);
-        });
+             });
+    // std("loadfile", std::array{"filename ", "mode", "env"}, [this](function_stack& stack, auto&& vars)
+    //     {
+    //         return BinaryenUnreachable(mod);
+    //     });
+    // std("next", std::array{"table", "index"}, [this](function_stack& stack, auto&& vars)
+    //     {
+    //         return BinaryenUnreachable(mod);
+    //     });
     // std("pairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
     //     {
     //         return BinaryenUnreachable(mod);
@@ -123,19 +123,14 @@ build_return_t runtime::open_basic_lib()
         {
             auto [vaarg] = vars;
             auto i       = stack.alloc(size_type(), "i");
+            auto size       = stack.alloc(size_type(), "size");
 
             auto exp = array_get(stack.get(vaarg), stack.get(i), anyref());
             exp      = call(functions::to_string, exp);
             exp      = call(functions::lua_str_to_js_array, exp);
             exp      = make_call("stdout", exp, BinaryenTypeNone());
-            exp = BinaryenLoop(mod,
-                               "+loop",
-                               make_if(binop(BinaryenLtUInt32(), stack.get(i), array_len(stack.get(vaarg))),
-                                       make_block(std::array{
-                                           exp,
-                                           stack.set(i, binop(BinaryenAddInt32(), stack.get(i), const_i32(1))),
-                                           BinaryenBreak(mod, "+loop", nullptr, nullptr),
-                                       })));
+
+            exp = loop(i, size, exp, const_i32(0), array_len(stack.get(vaarg)));
 
             return std::array{
                 exp,
@@ -237,7 +232,7 @@ build_return_t runtime::open_basic_lib()
                                                : ret;
                                 });
         });
-    // std("xpcall", std::array{"f", "msgh", "..."}, make_pcall(true));
+    std("xpcall", std::array{"f", "msgh", "..."}, make_pcall(true));
 
     std.result.push_back(local_get(0, get_type<table>()));
 
