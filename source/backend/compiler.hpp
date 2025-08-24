@@ -425,15 +425,6 @@ struct compiler : ext_types
         return ups;
     }
 
-    auto build_closure(expr_ref func_ref, expr_ref_list ups)
-    {
-        expr_ref exp[] = {
-            func_ref,
-            ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups)),
-        };
-        return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_type::function>()));
-    }
-
     template<typename F>
     auto get_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
     {
@@ -542,6 +533,7 @@ struct compiler : ext_types
                         set_var("table", _runtime.call(functions::open_table_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(7)})})),
                         set_var("io", _runtime.call(functions::open_io_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(11)})})),
                         set_var("os", _runtime.call(functions::open_os_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(11)})})),
+                        set_var("package", _runtime.call(functions::open_package_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(8)})})),
                         set_var("string", _runtime.call(functions::open_string_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(17)})})),
                         set_var("math", _runtime.call(functions::open_math_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(27)})})),
                         set_var("utf8", _runtime.call(functions::open_utf8_lib, std::array{_runtime.call(functions::table_create_map, std::array{const_i32(6)})})),

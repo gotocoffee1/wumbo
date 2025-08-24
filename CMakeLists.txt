@@ -24,6 +24,7 @@ add_library(wumbo
   "source/backend/runtime/libs/io.cpp"
   "source/backend/runtime/libs/math.cpp"
   "source/backend/runtime/libs/os.cpp"
+  "source/backend/runtime/libs/package.cpp"
   "source/backend/runtime/libs/string.cpp"
   "source/backend/runtime/libs/table.cpp"
   "source/backend/runtime/libs/utf8.cpp"

@@ -482,6 +482,15 @@ struct ext_types : utils
                                     })));
     }
 
+    auto build_closure(expr_ref func_ref, expr_ref_list ups)
+    {
+        expr_ref exp[] = {
+            func_ref,
+            ups.empty() ? null() : BinaryenArrayNewFixed(mod, BinaryenTypeGetHeapType(ref_array_type()), std::data(ups), std::size(ups)),
+        };
+        return BinaryenStructNew(mod, std::data(exp), std::size(exp), BinaryenTypeGetHeapType(type<value_type::function>()));
+    }
+
     BinaryenType ref_array_type() const
     {
         return types[0];

@@ -53,6 +53,7 @@
     DO(open_table_lib, get_type<table>(), get_type<table>())                                    \
     DO(open_io_lib, get_type<table>(), get_type<table>())                                       \
     DO(open_os_lib, get_type<table>(), get_type<table>())                                       \
+    DO(open_package_lib, get_type<table>(), get_type<table>())                                  \
     DO(open_string_lib, get_type<table>(), get_type<table>())                                   \
     DO(open_math_lib, get_type<table>(), get_type<table>())                                     \
     DO(open_utf8_lib, get_type<table>(), get_type<table>())                                     \
@@ -126,7 +127,13 @@ struct runtime : ext_types
 
         std::vector<var> vars;
         std::vector<BinaryenType> types;
-        size_t var_index = 0;
+        size_t var_index  = 0;
+        size_t label_name = 0;
+
+        size_t unique_num()
+        {
+            return label_name++;
+        }
 
         size_t alloc(BinaryenType type, std::string_view name = "")
         {
@@ -244,8 +251,7 @@ struct runtime : ext_types
 
     std::tuple<expr_ref_list, std::vector<size_t>> unpack_locals(function_stack& stack, nonstd::span<const char* const> p, expr_ref list)
     {
-        size_t label_name              = 0;
-        std::string none               = "+none" + std::to_string(label_name++);
+        std::string none               = "+none" + std::to_string(stack.unique_num());
         std::vector<const char*> names = {none.c_str()};
         std::vector<size_t> vars;
         expr_ref_list result;
@@ -386,15 +392,31 @@ struct runtime : ext_types
         runtime& self;
         expr_ref_list result;
 
+        void set(const char* name, expr_ref value)
+        {
+            result.push_back(self.call(functions::table_set,
+                                       std::array{
+                                           self.local_get(0, self.get_type<table>()),
+                                           self.add_string(name),
+                                           value,
+                                       }));
+        }
+
         template<typename F, size_t N>
         void operator()(const char* name, const std::array<const char*, N>& args, F&& f)
         {
-            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), name, args, std::forward<F>(f)));
+            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), name, args, self.null(), std::forward<F>(f)));
+        }
+
+        template<typename F, size_t N>
+        void operator()(const char* name, const std::array<const char*, N>& args, expr_ref ups, F&& f)
+        {
+            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), name, args, ups, std::forward<F>(f)));
         }
     };
 
     template<typename F, size_t N>
-    auto add_lua_func(expr_ref tbl, const char* name, const std::array<const char*, N>& arg_names, F&& f)
+    auto add_lua_func(expr_ref tbl, const char* name, const std::array<const char*, N>& arg_names, expr_ref ups, F&& f)
     {
         function_stack stack{mod};
 
@@ -414,7 +436,7 @@ struct runtime : ext_types
                     std::array{
                         tbl,
                         add_string(name),
-                        function::create(*this, std::array{func.get_ref(), null()}),
+                        function::create(*this, std::array{func.get_ref(), ups}),
                     });
     }
 };
