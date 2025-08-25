@@ -7,7 +7,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
       - name: Setup CMake
-        uses: lukka/get-cmake@v4
+        uses: lukka/get-cmake@v4.1.0
       - name: Setup CCache
         uses: hendrikmuhs/ccache-action@v1.2.12
         with:
