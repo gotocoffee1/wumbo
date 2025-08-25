@@ -4,7 +4,11 @@
     {
       "name": "platform-wasm32-emscripten",
       "hidden": true,
+      "environment": {
+        "EMSCRIPTEN_ROOT": "$env{EMSDK}/upstream/emscripten"
+      },
       "cacheVariables": {
+        "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "$env{EMSCRIPTEN_ROOT}/cmake/Modules/Platform/Emscripten.cmake",
         "VCPKG_TARGET_TRIPLET": "wasm32-emscripten"
       }
     },

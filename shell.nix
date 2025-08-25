@@ -32,7 +32,7 @@ pkgs.mkShell {
     ];
   shellHook = ''
     export VCPKG_ROOT=${pkgs.vcpkg}/share/vcpkg
-    export EMSCRIPTEN_ROOT=${unstable.emscripten}/share/emscripten
+    export EMSDK=${unstable.emscripten}
     export EM_CACHE=~/.emscripten_cache
   '';
 }

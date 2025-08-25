@@ -40,8 +40,10 @@ add_library(wumbo
 add_library(wumbo::wumbo ALIAS wumbo)
 
 find_package(pegtl CONFIG REQUIRED)
-find_package(CLI11 CONFIG REQUIRED)
 find_package(span-lite CONFIG REQUIRED)
+if (NOT EMSCRIPTEN)
+  find_package(CLI11 CONFIG REQUIRED)
+endif()
 
 set(temp ${CMAKE_CXX_FLAGS})
 set(temp2 ${CMAKE_C_FLAGS})
