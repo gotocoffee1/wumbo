@@ -1,0 +1,25 @@
+name: CI
+on: push
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+      - name: Setup CMake
+        uses: lukka/get-cmake@v4
+      - name: Setup CCache
+        uses: hendrikmuhs/ccache-action@v1.2.12
+        with:
+          verbose: 2
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.73
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+      - name: Run CMake
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: 'wasm32-emscripten-clang'
+          buildPreset: 'wasm32-emscripten-clang-release'
