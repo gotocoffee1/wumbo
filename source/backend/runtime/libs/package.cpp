@@ -5,7 +5,7 @@ namespace wumbo
 
 build_return_t runtime::open_package_lib()
 {
-    lua_std_func_t std{*this};
+    lua_std_func_t std{*this, "package"};
 
     std.set("config", add_string("TODO"));
     std.set("cpath", add_string("TODO"));

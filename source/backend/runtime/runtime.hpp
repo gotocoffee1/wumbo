@@ -390,6 +390,7 @@ struct runtime : ext_types
     struct lua_std_func_t
     {
         runtime& self;
+        std::string prefix;
         expr_ref_list result;
 
         void set(const char* name, expr_ref value)
@@ -405,13 +406,15 @@ struct runtime : ext_types
         template<typename F, size_t N>
         void operator()(const char* name, const std::array<const char*, N>& args, F&& f)
         {
-            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), name, args, self.null(), std::forward<F>(f)));
+            auto pre_name = prefix.empty() ? name : prefix + "." + name;
+            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), pre_name.c_str(), args, self.null(), std::forward<F>(f)));
         }
 
         template<typename F, size_t N>
         void operator()(const char* name, const std::array<const char*, N>& args, expr_ref ups, F&& f)
         {
-            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), name, args, ups, std::forward<F>(f)));
+            auto pre_name = prefix.empty() ? name : prefix + "." + name;
+            result.push_back(self.add_lua_func(self.local_get(0, self.get_type<table>()), pre_name.c_str(), args, ups, std::forward<F>(f)));
         }
     };
 

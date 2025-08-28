@@ -5,7 +5,7 @@ namespace wumbo
 
 build_return_t runtime::open_string_lib()
 {
-    lua_std_func_t std{*this};
+    lua_std_func_t std{*this, "string"};
 
     std("byte", std::array{"s", "i", "j"}, [this](runtime::function_stack& stack, auto&& vars) -> expr_ref
         {

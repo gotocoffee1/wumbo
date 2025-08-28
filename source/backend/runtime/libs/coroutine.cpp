@@ -5,7 +5,7 @@ namespace wumbo
 
 build_return_t runtime::open_coroutine_lib()
 {
-    lua_std_func_t std{*this};
+    lua_std_func_t std{*this, "coroutine"};
 
     std("create", std::array{"f"}, [this](runtime::function_stack& stack, auto&& vars) -> expr_ref
         {

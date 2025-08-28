@@ -5,7 +5,7 @@ namespace wumbo
 
 build_return_t runtime::open_utf8_lib()
 {
-    lua_std_func_t std{*this};
+    lua_std_func_t std{*this, "utf8"};
 
     std("char", std::array{"..."}, [this](runtime::function_stack& stack, auto&& vars) -> expr_ref
         {

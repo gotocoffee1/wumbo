@@ -5,7 +5,7 @@ namespace wumbo
 
 build_return_t runtime::open_io_lib()
 {
-    lua_std_func_t std{*this};
+    lua_std_func_t std{*this, "io"};
 
     std("close", std::array{"file"}, [this](runtime::function_stack& stack, auto&& vars) -> expr_ref
         {

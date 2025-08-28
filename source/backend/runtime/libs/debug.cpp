@@ -5,7 +5,7 @@ namespace wumbo
 
 build_return_t runtime::open_debug_lib()
 {
-    lua_std_func_t std{*this};
+    lua_std_func_t std{*this, "debug"};
 
     std("debug", std::array<const char*, 0>{}, [this](runtime::function_stack& stack, auto&& vars) -> expr_ref
         {
