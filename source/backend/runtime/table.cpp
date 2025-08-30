@@ -219,11 +219,11 @@ struct runtime::tbl
                                           BinaryenLoop(mod,
                                                        "+loop",
                                                        self->make_block(std::array{
-                                                           BinaryenBreak(mod, "+loop", BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), tee_capacity_dec))), nullptr),
-                                                           insert(std::array{
-                                                               stack.get(new_hash_map),
-                                                               stack.get(ele),
-                                                           }),
+                                                           self->make_if(self->unop(BinaryenEqZInt32(), BinaryenRefIsNull(mod, stack.tee(ele, hash_array::get(*self, stack.get(hash_map), tee_capacity_dec)))),
+                                                                         insert(std::array{
+                                                                             stack.get(new_hash_map),
+                                                                             stack.get(ele),
+                                                                         })),
                                                            BinaryenBreak(mod, "+loop", stack.get(capacity), nullptr),
                                                        })),
                                       });

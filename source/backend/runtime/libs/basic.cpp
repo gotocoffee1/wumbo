@@ -9,16 +9,17 @@ build_return_t runtime::open_basic_lib()
     BinaryenAddFunctionImport(mod, "stdout", "native", "stdout", BinaryenTypeExternref(), BinaryenTypeNone());
     BinaryenAddFunctionImport(mod, "load_lua", "load", "load", BinaryenTypeExternref(), lua_func());
 
-    // std("assert", std::arraystd::array{"v" /*, "message"*/}, [this](runtime::function_stack& stack, auto&& vars)
-    //          {
-    //              auto [v] = vars;
+    std("assert", std::array{"v", "..."}, [this](runtime::function_stack& stack, auto&& vars)
+        {
+            auto [v, message] = vars;
 
-    //              auto alt = [&]()
-    //              {
-    //                  return add_string("assertion failed!");
-    //              };
-    //              return make_if(call(functions::to_bool, stack.get(v), make_return(local_get(args_index, ref_array_type())), throw_error(at_or_null(args_index, 1, nullptr, alt))));
-    //          });
+            auto alt = [&]()
+            {
+                return add_string("assertion failed!");
+            };
+            auto excep = make_if(binop(BinaryenLtUInt32(), array_len(stack.get(message)), const_i32(1)), ref_array::get(*this, stack.get(message), const_i32(0)), alt());
+            return make_if(call(functions::to_bool, stack.get(v)), make_return(local_get(args_index, ref_array_type())), throw_error(excep));
+        });
     std("collectgarbage", std::array{"opt", "arg"}, [this](function_stack& stack, auto&& vars)
         {
             auto [opt, arg] = vars;
@@ -38,10 +39,10 @@ build_return_t runtime::open_basic_lib()
         {
             return BinaryenUnreachable(mod);
         });
-    // std("ipairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
-    //     {
-    //         return BinaryenUnreachable(mod);
-    //     });
+    std("ipairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
 
     std("load", std::array{"chunk", "chunkname", "mode", "env"}, ref_array::create_fixed(*this, local_get(0, get_type<table>())), [this](function_stack& stack, auto&& vars)
         {
@@ -69,18 +70,18 @@ build_return_t runtime::open_basic_lib()
                                            return exp ? make_return(make_ref_array(stack, std::array{exp})) : make_return(null());
                                        }));
         });
-    // std("loadfile", std::array{"filename ", "mode", "env"}, [this](function_stack& stack, auto&& vars)
-    //     {
-    //         return BinaryenUnreachable(mod);
-    //     });
-    // std("next", std::array{"table", "index"}, [this](function_stack& stack, auto&& vars)
-    //     {
-    //         return BinaryenUnreachable(mod);
-    //     });
-    // std("pairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
-    //     {
-    //         return BinaryenUnreachable(mod);
-    //     });
+    std("loadfile", std::array{"filename ", "mode", "env"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("next", std::array{"table", "index"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
+    std("pairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
+        {
+            return BinaryenUnreachable(mod);
+        });
 
     auto make_pcall = [this](bool x)
     {
