@@ -132,7 +132,12 @@ build_return_t runtime::open_basic_lib()
             exp      = call(functions::lua_str_to_js_array, exp);
             exp      = make_call("stdout", exp, BinaryenTypeNone());
 
-            exp = loop(i, size, exp, const_i32(0), array_len(stack.get(vaarg)));
+            exp = loop(i, size, make_block(std::array{
+                                    make_if(stack.get(i), make_call("stdout", call(functions::lua_str_to_js_array, add_string("\t")), BinaryenTypeNone())),
+                                    exp,
+                                }),
+                       const_i32(0),
+                       array_len(stack.get(vaarg)));
 
             return std::array{
                 exp,

@@ -9,15 +9,24 @@ const instantiateBuffer = async (buffer, importObject) => {
 const makeImportObject = (override, load_func) => {
   const bufToStr = (buf) => new TextDecoder().decode(buf);
   const strToBuf = (str) => new TextEncoder().encode(str);
+
+  const writer = (println) => {
+    let buffer =  new Uint8Array(0);
+    return (s) => {
+      buffer = new Uint8Array([ ...buffer, ...s]);
+      for (let i; -1 !== (i = buffer.indexOf(0xa)); buffer = buffer.slice(i + 1))
+        println(bufToStr(buffer.slice(0, i)));
+    }
+  };
   const importObject = {
     load: {
       load: WebAssembly.Suspending
         ? new WebAssembly.Suspending(load_func)
-        : () => {},
+        : () => { },
     },
     native: {
-      stdout: (str) => console.log(bufToStr(str)),
-      stderr: (str) => console.error(bufToStr(str)),
+      stdout: writer(console.log),
+      stderr: writer(console.error),
       toNum: (str) => Number(bufToStr(str)),
       toInt: (str) => BigInt(Number(bufToStr(str))),
       toString: (num) => strToBuf(num.toString()),
@@ -111,9 +120,9 @@ export const newInstance = async ({
     const func = WebAssembly.promising
       ? WebAssembly.promising(exports.init_env)
       : (...args) =>
-          new Promise((resolve) => {
-            resolve(exports.init_env(...args));
-          });
+        new Promise((resolve) => {
+          resolve(exports.init_env(...args));
+        });
 
     const jsToLua = (obj) => {
       switch (typeof obj) {
