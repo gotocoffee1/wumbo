@@ -10,7 +10,7 @@ CMakeUserPresets.json
 archive/
 .direnv/
 .cache/
+node_modules/
 compile_commands.json
-wumbo.mjs
-wumbo.wasm
-
+/*.mjs
+/*.wasm

@@ -1,0 +1,7 @@
+{
+    "name": "wumbo",
+    "version": "1.0.0",
+    "devDependencies": {
+        "fengari": "^0.1.4"
+    }
+}

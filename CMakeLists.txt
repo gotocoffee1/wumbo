@@ -120,7 +120,7 @@ set_target_properties(
   EXPORT_NAME wumbo
   OUTPUT_NAME wumbo)
 
-#add_subdirectory(benchmark)
+add_subdirectory(benchmark)
 
 # ---- Install rules ----
 if(NOT CMAKE_SKIP_INSTALL_RULES)
