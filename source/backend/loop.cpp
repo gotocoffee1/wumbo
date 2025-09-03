@@ -68,6 +68,7 @@ expr_ref_list compiler::operator()(const for_statement& p)
     local_variables vars_help;
     vars_help.explist = p.exp;
     vars_help.names   = {"*var", "*limit", "*step"};
+    vars_help.usage.resize(3);
 
     expr_ref_list result = {(*this)(vars_help)};
 
@@ -79,6 +80,7 @@ expr_ref_list compiler::operator()(const for_statement& p)
     w.condition.inner.emplace<box<bin_operation>>(std::move(cmp));
     local_variables counter;
     counter.names = {p.var};
+    counter.usage = {p.usage};
     counter.explist.emplace_back().inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
     w.inner.statements.emplace_back().inner.emplace<local_variables>(std::move(counter));
     append(w.inner.statements, p.inner.statements);
@@ -108,6 +110,7 @@ expr_ref_list compiler::operator()(const for_each& p)
     local_variables vars_help;
     vars_help.explist = p.explist;
     vars_help.names   = {"*f", "*s", "*var"};
+    vars_help.usage.resize(3);
 
     expr_ref_list result = {(*this)(vars_help)};
 
@@ -115,6 +118,7 @@ expr_ref_list compiler::operator()(const for_each& p)
 
     local_variables vars;
     vars.names = p.names;
+    vars.usage = p.usage;
 
     auto& call = vars.explist.emplace_back().inner.emplace<box<prefixexp>>();
     call->chead.emplace<name_t>("*f");

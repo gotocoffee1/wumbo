@@ -190,13 +190,21 @@ struct analyzer
             visit(*p.else_block);
     }
 
-    // TODO
     void visit(for_statement& p)
     {
+        visit(p.exp);
+        _func_stack.alloc_local(p.var, p.usage);
+
         visit(p.inner);
     }
     void visit(for_each& p)
     {
+        visit(p.explist);
+        p.usage.resize(p.names.size());
+        size_t i = 0;
+        for (auto& n : p.names)
+            _func_stack.alloc_local(n, p.usage[i++]);
+
         visit(p.inner);
     }
     void visit(function_definition& p)

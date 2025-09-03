@@ -245,6 +245,7 @@ struct for_statement
     block inner;
     std::vector<expression> exp; // size == 2 || size == 3
     name_t var;
+    local_usage usage;
 };
 
 struct for_each
@@ -252,6 +253,7 @@ struct for_each
     block inner;
     name_list names;         // size >=1
     expression_list explist; // size >=1
+    std::vector<local_usage> usage;
 };
 
 struct for_combined
