@@ -95,6 +95,12 @@ const load = async (bytes, importObject, optimize, format, standalone) => {
   return [exports, wat];
 };
 
+export const format = {
+    none: undefined,
+    function: 0,
+    stack: 1,
+};
+
 export const newInstance = async ({
   override = undefined,
   optimize = true,

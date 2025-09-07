@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Benchmark Bar Graph</title>
+    <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
+    <script type="module">
+        import benchmark from "./result.json" with { type: 'json' };
+
+        google.charts.load('current', { packages: ['corechart', 'bar'] });
+        google.charts.setOnLoadCallback(drawChart);
+
+        const container = document.getElementById('bargraph');
+        const info = document.createElement('div');
+        info.innerHTML = `Node version: ${benchmark.version}<br>v8 version: ${benchmark.v8}<br>platform: ${benchmark.platform} ${benchmark.arch}<br>cpu: ${benchmark.cpu}`;
+        container.appendChild(info);
+
+        function drawChart() {
+            benchmark.result.forEach(bench => {
+                const benchmarkData = [
+                    ['Engine', 'Compilation time (ms)', 'Running time (ms)'],
+                    ...bench.data
+                ];
+                const data = google.visualization.arrayToDataTable(benchmarkData);
+
+                const h = data.getNumberOfRows() * 12;
+                const options = {
+                    title: bench.title,
+                    chartArea: { left: '20%', width: '70%', height: h },
+                    height: h + 100,
+                    fontSize: 10,
+                    bar: { groupWidth: "80%" },
+                    hAxis: { title: "Time (ms)" },
+                    vAxis: {
+                        title: 'Engine'
+                    },
+                    legend: { position: "none" },
+                    isStacked: true,
+                };
+
+                data.addColumn({ type: "number", role: "annotation" });
+                for (let rowIndex = 0; rowIndex < data.getNumberOfRows(); rowIndex++) {
+                    data.setValue(rowIndex, 3, data.getValue(rowIndex, 1) + data.getValue(rowIndex, 2));
+                }
+                const sortOptions = [{ column: 3 }];
+                if (sortOptions != null)
+                    data.sort(sortOptions); // sort after assigning colors
+
+                const formatter1 = new google.visualization.NumberFormat({ fractionDigits: 0 });
+                formatter1.format(data, 3);
+                const chartDiv = document.createElement('div');
+                container.appendChild(chartDiv);
+                const chart = new google.visualization.BarChart(chartDiv);
+                chart.draw(data, options);
+            });
+        }
+    </script>
+</head>
+
+<body>
+    <h2>Lua Benchmark Bar Graph</h2>
+    <div id="bargraph" style="width: 100%; height: 400px;"></div>
+</body>
+
+</html>

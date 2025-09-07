@@ -59,7 +59,6 @@ expr_ref_list compiler::operator()(const repeat_statement& p)
     return {BinaryenLoop(mod, begin.c_str(), make_block(body, end.c_str()))};
 }
 
-
 // TODO: make compatile to lua spec
 expr_ref_list compiler::operator()(const for_statement& p)
 {
@@ -67,8 +66,12 @@ expr_ref_list compiler::operator()(const for_statement& p)
 
     local_variables vars_help;
     vars_help.explist = p.exp;
-    vars_help.names   = {"*var", "*limit", "*step"};
+    if (vars_help.explist.size() < 3)
+        vars_help.explist.push_back(expression{int_type{1}});
+    vars_help.names = {"*var", "*limit", "*step"};
     vars_help.usage.resize(3);
+    for (auto& usage : vars_help.usage)
+        usage.read_count = 1;
 
     expr_ref_list result = {(*this)(vars_help)};
 
@@ -85,7 +88,6 @@ expr_ref_list compiler::operator()(const for_statement& p)
     w.inner.statements.emplace_back().inner.emplace<local_variables>(std::move(counter));
     append(w.inner.statements, p.inner.statements);
     w.inner.retstat = p.inner.retstat;
-
 
     bin_operation inc;
     inc.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
@@ -111,7 +113,8 @@ expr_ref_list compiler::operator()(const for_each& p)
     vars_help.explist = p.explist;
     vars_help.names   = {"*f", "*s", "*var"};
     vars_help.usage.resize(3);
-
+    for (auto& usage : vars_help.usage)
+        usage.read_count = 1;
     expr_ref_list result = {(*this)(vars_help)};
 
     loop_scope scope{_func_stack};

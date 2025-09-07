@@ -1,12 +1,12 @@
 export const benchmark = ({ name, compile, run }) => {
 
     return async (data) => {
-        console.log(`benchmark [${name}]`);
-        console.time("compile");
+        const compileStart = performance.now();
         const result = await compile(data);
-        console.timeEnd("compile");
-        console.time("run");
+        const compileEnd = performance.now();
         await run(result);
-        console.timeEnd("run");
+        const runEnd = performance.now();
+         
+        return [name, compileEnd - compileStart, runEnd - compileEnd]
     };
 };
