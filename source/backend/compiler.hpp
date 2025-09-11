@@ -277,9 +277,9 @@ struct compiler : ext_types
 
     expr_ref_list unpack_locals(const name_list& p, expr_ref list, nonstd::span<const local_usage> usage, bool is_vararg = false)
     {
-        auto offset                    = _func_stack.local_offset();
-        std::string none               = "+none" + std::to_string(label_name++);
-        std::vector<const char*> names = {none.c_str()};
+        std::vector<std::string> names = {"+none" + std::to_string(label_name++)};
+        std::vector<size_t> vars;
+
         expr_ref_list result;
 
         if (p.empty())
@@ -291,7 +291,7 @@ struct compiler : ext_types
         size_t i = 0;
         for (auto& arg : p)
         {
-            names.push_back(arg.c_str());
+            names.push_back(arg + std::to_string(label_name++));
 
             //local_tee(local_index, BinaryenStructNew(mod, &val, 1, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()));
 
@@ -305,25 +305,29 @@ struct compiler : ext_types
                                                nullptr,
                                                0,
                                                BinaryenTypeGetHeapType(upvalue_type()))));
+                vars.push_back(index);
             }
             else
-                _func_stack.alloc_lua_local(arg, anyref());
+                vars.push_back(_func_stack.alloc_lua_local(arg, anyref()));
         }
 
         const char* vararg = "...";
         if (is_vararg)
         {
-            names.push_back(vararg);
+            names.push_back(vararg + std::to_string(label_name++));
         }
-
+        std::vector<const char*> lbl;
+        lbl.reserve(names.size());
+        for (auto& n : names)
+            lbl.push_back(n.c_str());
         std::array<expr_ref, 2> exp = {
             BinaryenSwitch(mod,
-                           std::data(names),
-                           std::size(names) - 1,
-                           names.back(),
+                           std::data(lbl),
+                           std::size(lbl) - 1,
+                           lbl.back(),
                            array_len(BinaryenBrOn(mod,
                                                   BinaryenBrOnNull(),
-                                                  names[0],
+                                                  lbl[0],
                                                   list,
                                                   BinaryenTypeNone())),
                            nullptr),
@@ -331,9 +335,11 @@ struct compiler : ext_types
         };
         if (is_vararg)
         {
-            exp[0] = BinaryenBlock(mod, vararg, std::data(exp), 1, BinaryenTypeAuto());
+            exp[0] = BinaryenBlock(mod, lbl.back(), std::data(exp), 1, BinaryenTypeAuto());
 
-            auto new_array                             = _func_stack.alloc_lua_local(vararg, ref_array_type());
+            auto new_array = _func_stack.alloc_lua_local(vararg, ref_array_type());
+            vars.push_back(new_array);
+
             _func_stack.functions.back().vararg_offset = new_array;
 
             auto size = help_var_scope{_func_stack, size_type()};
@@ -354,18 +360,18 @@ struct compiler : ext_types
 
         bool first = !is_vararg;
         size_t j   = p.size();
-        for (auto iter = p.rbegin(); iter != p.rend(); ++iter)
+        while (j > 0)
         {
+            exp[0] = BinaryenBlock(mod, lbl[j], std::data(exp), first ? 1 : std::size(exp), BinaryenTypeAuto());
             j--;
-            exp[0] = BinaryenBlock(mod, iter->c_str(), std::data(exp), first ? 1 : std::size(exp), BinaryenTypeAuto());
-            first  = false;
+            first = false;
 
             auto get = array_get(
                 list,
                 const_i32(j),
                 anyref());
 
-            exp[1] = local_set(j + offset,
+            exp[1] = local_set(vars[j],
                                usage[j].is_upvalue() ? BinaryenStructNew(
                                                            mod,
                                                            &get,
@@ -374,7 +380,7 @@ struct compiler : ext_types
                                                      : get);
         }
 
-        result.push_back(make_block(exp, names[0]));
+        result.push_back(make_block(exp, lbl[0]));
         return result;
     }
 

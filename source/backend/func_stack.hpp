@@ -68,7 +68,6 @@ struct function_stack
     void pop_loop()
     {
         loop_stack.back()--;
-        loop_counter--;
     }
 
     void push_block()
@@ -114,11 +113,6 @@ struct function_stack
         assert(is_index_local(index) && "invalid index");
         auto& func = functions.back();
         return func.arg_count + (index - func.offset);
-    }
-
-    local_index_t local_offset() const
-    {
-        return local_offset(vars.size());
     }
 
     bool is_index_local(global_index_t index) const

@@ -24,6 +24,7 @@ pkgs.mkShell {
     ]
     ++ [
       gcc
+      gdb
       unstable.emscripten
       python3
       nodejs_23
