@@ -7,9 +7,10 @@ FetchContent_Declare(
   GIT_TAG c3e870ded0ab60b842a28caa86b465adacd777fd)
 
 FetchContent_MakeAvailable(lua)
-
-add_executable(lua_run main.c)
-target_link_libraries(lua_run PRIVATE lua::static)
+if (EMSCRIPTEN)
+  add_executable(lua_run main.c)
+  target_link_libraries(lua_run PRIVATE lua::static)
+endif()
 
 if (EMSCRIPTEN)
   # target_compile_options(lua PUBLIC

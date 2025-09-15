@@ -27,6 +27,11 @@ expr_ref compiler::_funchead(const funchead& p)
 
 expr_ref compiler::_functail(const functail& p, expr_ref function)
 {
+    if (BinaryenExpressionGetType(function) == ref_array_type())
+    {
+        auto local = help_var_scope{_func_stack, ref_array_type()};
+        function   = at_or_null(local, 0, function);
+    }
     expr_ref_list args;
 
     if (p.name)
@@ -47,6 +52,11 @@ expr_ref compiler::_functail(const functail& p, expr_ref function)
 
 expr_ref compiler::_vartail(const vartail& p, expr_ref var)
 {
+    if (BinaryenExpressionGetType(var) == ref_array_type())
+    {
+        auto local = help_var_scope{_func_stack, ref_array_type()};
+        var        = at_or_null(local, 0, var);
+    }
     return std::visit(overload{
                           [&](const expression& exp)
                           {
