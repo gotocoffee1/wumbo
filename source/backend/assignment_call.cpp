@@ -73,6 +73,11 @@ expr_ref compiler::_vartail(const vartail& p, expr_ref var)
 
 expr_ref compiler::_vartail_set(const vartail& p, expr_ref var, expr_ref value)
 {
+    if (BinaryenExpressionGetType(var) == ref_array_type())
+    {
+        auto local = help_var_scope{_func_stack, ref_array_type()};
+        var        = at_or_null(local, 0, var);
+    }
     return std::visit(overload{
                           [&](const expression& exp)
                           {

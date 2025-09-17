@@ -15,7 +15,7 @@ const algos = [
 const result = [];
 
 for (const algo of algos) {
-    const data = await fs.readFile(algo);
+    const data = await fs.readFile(path.join("algo", algo));
     result.push({
         title: path.basename(algo, ".lua"),
         data: [
