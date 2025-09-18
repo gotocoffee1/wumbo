@@ -12,14 +12,19 @@
 
         const container = document.getElementById('bargraph');
         const info = document.createElement('div');
-        info.innerHTML = `Node version: ${benchmark.version}<br>v8 version: ${benchmark.v8}<br>platform: ${benchmark.platform} ${benchmark.arch}<br>cpu: ${benchmark.cpu}`;
+        info.innerHTML = `Node version: ${benchmark.version}<br>
+        v8 version: ${benchmark.v8}<br>
+        platform: ${benchmark.platform} ${benchmark.arch}<br>
+        cpu: ${benchmark.cpu}<br>
+        ${benchmark.lua}<br>
+        ${benchmark.luajit}`;
         container.appendChild(info);
 
         function drawChart() {
             benchmark.result.forEach(bench => {
                 const benchmarkData = [
                     ['Engine', 'Compilation time (ms)', 'Running time (ms)'],
-                    ...bench.data
+                    ...bench.data.map(([name, ctime, rtime]) => [name, ctime, rtime])
                 ];
                 const data = google.visualization.arrayToDataTable(benchmarkData);
 

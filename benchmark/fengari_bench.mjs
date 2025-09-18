@@ -6,16 +6,22 @@ const lua = fengari.lua;
 const lauxlib = fengari.lauxlib;
 const lualib = fengari.lualib;
 
-export const fengari_bench = benchmark({
-    name: "fengari",
-    compile: (data) => {
+await benchmark({
+    init: () => {
         const L = lauxlib.luaL_newstate();
         lualib.luaL_openlibs(L);
-        lauxlib.luaL_loadstring(L, data);
+        lua.lua_pushnil(L);
         return L;
     },
-    run: (L) => {
+    compile: (L, data) => {
+        lua.lua_pop(L, 1);
+        lauxlib.luaL_loadstring(L, data);
+    },
+    run: (L, _) => {
+        lua.lua_pushvalue(L, -1);
         lua.lua_call(L, 0, 0);
+    },
+    cleanup: (L) => {
         lua.lua_close(L);
     },
 });
