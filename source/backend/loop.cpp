@@ -4,21 +4,23 @@
 namespace wumbo
 {
 
-static std::string loop_end(compiler* self)
+static std::string loop_end(function_info& func)
 {
-    return "*loop_end" + std::to_string(self->_func_stack.loop_counter);
+    return func.loop_stack.back() + "_end";
 }
 
-static std::string loop_begin(compiler* self)
+static std::string loop_begin(function_info& func)
 {
-    return "*loop_begin" + std::to_string(self->_func_stack.loop_counter);
+    return func.loop_stack.back() + "_begin";
 }
 
 expr_ref_list compiler::operator()(const key_break& p)
 {
-    if (_func_stack.loop_stack.back() > 0)
+    auto& func = _func_stack.current_function();
+
+    if (!func.loop_stack.empty())
     {
-        auto end = loop_end(this);
+        auto end = loop_end(func);
 
         return {BinaryenBreak(mod, end.c_str(), nullptr, nullptr)};
     }
@@ -27,15 +29,16 @@ expr_ref_list compiler::operator()(const key_break& p)
 }
 
 expr_ref_list compiler::operator()(const while_statement& p)
-
 {
-    loop_scope scope{_func_stack};
+    auto& func = _func_stack.current_function();
+
+    loop_scope scope{func};
     auto cond = (*this)(p.condition);
 
     auto body = (*this)(p.inner);
 
-    auto begin = loop_begin(this);
-    auto end   = loop_end(this);
+    auto begin = loop_begin(func);
+    auto end   = loop_end(func);
 
     body.push_back(BinaryenBreak(mod, begin.c_str(), _runtime.call(functions::to_bool, cond), nullptr));
 
@@ -47,12 +50,13 @@ expr_ref_list compiler::operator()(const while_statement& p)
 }
 expr_ref_list compiler::operator()(const repeat_statement& p)
 {
-    loop_scope scope{_func_stack};
+    auto& func = _func_stack.current_function();
+    loop_scope scope{func};
 
     auto cond = (*this)(p.condition);
 
-    auto begin = loop_begin(this);
-    auto end   = loop_end(this);
+    auto begin = loop_begin(func);
+    auto end   = loop_end(func);
 
     auto body = (*this)(p.inner);
     body.push_back(BinaryenBreak(mod, begin.c_str(), _runtime.call(functions::to_bool_not, cond), nullptr));
@@ -108,16 +112,17 @@ expr_ref_list compiler::operator()(const for_each& p)
     // https://www.lua.org/manual/5.3/manual.html#3.3.5
 
     block_scope block{_func_stack};
-
+    
     local_variables vars_help;
     vars_help.explist = p.explist;
     vars_help.names   = {"*f", "*s", "*var"};
     vars_help.usage.resize(3);
     for (auto& usage : vars_help.usage)
-        usage.read_count = 1;
+    usage.read_count = 1;
     expr_ref_list result = {(*this)(vars_help)};
-
-    loop_scope scope{_func_stack};
+    
+    auto& func = _func_stack.current_function();
+    loop_scope scope{func};
 
     local_variables vars;
     vars.names = p.names;
@@ -129,8 +134,8 @@ expr_ref_list compiler::operator()(const for_each& p)
     args.emplace_back().inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*s");
     args.emplace_back().inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
 
-    auto begin = loop_begin(this);
-    auto end   = loop_end(this);
+    auto begin = loop_begin(func);
+    auto end   = loop_end(func);
 
     expr_ref_list inner = (*this)(vars);
 

@@ -45,30 +45,39 @@ struct function_info
 
     std::vector<std::string> label_stack;
     std::vector<std::string> request_label_stack;
+    // count nested loops per function
+    std::vector<std::string> loop_stack;
+
+    size_t label_name = 0;
+
+    void push_loop()
+    {
+        loop_stack.push_back(make_label("*loop"));
+    }
+
+    void pop_loop()
+    {
+        loop_stack.pop_back();
+    }
+
+    size_t unique_num()
+    {
+        return label_name++;
+    }
+
+    std::string make_label(std::string_view prefix)
+    {
+        return std::string{prefix} + std::to_string(unique_num());
+    }
 };
 
 struct function_stack
 {
-    // count nested loops per function
-    std::vector<size_t> loop_stack;
-    size_t loop_counter;
-
     std::vector<size_t> blocks;
     std::vector<function_info> functions;
     std::vector<std::vector<size_t>> upvalues;
 
     std::vector<local_var> vars;
-
-    void push_loop()
-    {
-        loop_stack.back()++;
-        loop_counter++;
-    }
-
-    void pop_loop()
-    {
-        loop_stack.back()--;
-    }
 
     void push_block()
     {
@@ -93,19 +102,20 @@ struct function_stack
         func_info.offset        = vars.size();
         func_info.arg_count     = func_arg_count;
         func_info.vararg_offset = vararg_offset;
-
-        loop_stack.push_back(0);
     }
 
     void pop_function()
     {
         auto func_offset = functions.back().offset;
 
-        loop_stack.pop_back();
-
         vars.resize(func_offset);
         functions.pop_back();
         upvalues.pop_back();
+    }
+
+    function_info& current_function()
+    {
+        return functions.back();
     }
 
     local_index_t local_offset(global_index_t index) const

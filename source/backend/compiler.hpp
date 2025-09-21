@@ -55,8 +55,8 @@ struct compiler : ext_types
 
     struct loop_scope
     {
-        function_stack& _self;
-        loop_scope(function_stack& self)
+        function_info& _self;
+        loop_scope(function_info& self)
             : _self{self}
         {
             _self.push_loop();
@@ -71,7 +71,6 @@ struct compiler : ext_types
     function_stack _func_stack;
 
     size_t function_name = 0;
-    size_t label_name    = 0;
 
     expr_ref get_upvalue(size_t index)
     {
@@ -277,7 +276,9 @@ struct compiler : ext_types
 
     expr_ref_list unpack_locals(const name_list& p, expr_ref list, nonstd::span<const local_usage> usage, bool is_vararg = false)
     {
-        std::vector<std::string> names = {"+none" + std::to_string(label_name++)};
+
+        auto& func = _func_stack.current_function();
+        std::vector<std::string> names = {func.make_label("+none")};
         std::vector<size_t> vars;
 
         expr_ref_list result;
@@ -291,7 +292,7 @@ struct compiler : ext_types
         size_t i = 0;
         for (auto& arg : p)
         {
-            names.push_back(arg + std::to_string(label_name++));
+            names.push_back(func.make_label(arg));
 
             //local_tee(local_index, BinaryenStructNew(mod, &val, 1, BinaryenTypeGetHeapType(upvalue_type())), upvalue_type()));
 
@@ -314,7 +315,7 @@ struct compiler : ext_types
         const char* vararg = "...";
         if (is_vararg)
         {
-            names.push_back(vararg + std::to_string(label_name++));
+            names.push_back(func.make_label(vararg));
         }
         std::vector<const char*> lbl;
         lbl.reserve(names.size());
