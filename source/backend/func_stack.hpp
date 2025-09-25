@@ -178,7 +178,9 @@ struct function_stack
     {
         if (auto local = std::find_if(vars.rbegin(), vars.rend(), [&var_name](const local_var& var)
                                       {
-                                          return !(var.flags & local_var::is_helper) && var.current_name() == var_name;
+                                          return !(var.flags & local_var::is_helper)
+                                                 && !!(var.flags & local_var::is_used)
+                                                 && var.current_name() == var_name;
                                       });
             local != vars.rend())
         {
