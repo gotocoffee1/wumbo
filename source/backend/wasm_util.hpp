@@ -935,11 +935,6 @@ struct ext_types : utils
             static constexpr const char* name = "hash";
         };
 
-        struct array_size : member_desc<size_, true>
-        {
-            static constexpr const char* name = "array_size";
-        };
-
         struct hash_size : member_desc<size_, true>
         {
             static constexpr const char* name = "hash_size";
@@ -949,7 +944,7 @@ struct ext_types : utils
         {
             static constexpr const char* name = "metatable";
         };
-        using members = member_list<array, hash, array_size, hash_size, metatable>;
+        using members = member_list<array, hash, hash_size, metatable>;
     };
 
     using types_ = type_builder<ref_array,

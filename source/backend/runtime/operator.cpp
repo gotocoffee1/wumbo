@@ -407,7 +407,7 @@ build_return_t runtime::len()
                                         case value_type::string:
                                             return make_return(new_integer(size_to_integer(array_len(exp))));
                                         case value_type::table:
-                                            return make_return(new_integer(size_to_integer(table::get<table::array_size>(*this, exp))));
+                                            return make_return(new_integer(size_to_integer(array_len(table::get<table::array>(*this, exp)))));
                                         case value_type::userdata:
                                         {
                                             // TODO

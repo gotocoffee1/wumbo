@@ -37,7 +37,8 @@ build_return_t runtime::open_basic_lib()
         });
     std("getmetatable", std::array{"object"}, [this](function_stack& stack, auto&& vars)
         {
-            return BinaryenUnreachable(mod);
+            auto [object] = vars;
+            return make_ref_array(stack, std::array{table::get<table::metatable>(*this, stack.get(object))});
         });
     std("ipairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
         {
@@ -167,7 +168,11 @@ build_return_t runtime::open_basic_lib()
         });
     std("setmetatable", std::array{"table", "metatable"}, [this](function_stack& stack, auto&& vars)
         {
-            return BinaryenUnreachable(mod);
+            auto [table, metatable] = vars;
+            return std::array{
+                table::set<table::metatable>(*this, stack.get(table), stack.get(metatable)),
+                make_ref_array(stack, std::array{stack.get(table)}),
+            };
         });
     std("tonumber", std::array{"e", "base"}, [this](function_stack& stack, auto&& vars)
         {

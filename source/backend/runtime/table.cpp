@@ -91,6 +91,10 @@ struct runtime::tbl
         return self->binop(BinaryenRemUInt32(),
                            hash_value,
                            len);
+        // return self->binop(BinaryenAndInt32(),
+        //                    hash_value,
+        //                    self->binop(BinaryenSubInt32(),
+        //                    len, self->const_i32(1)));
     }
 
     static auto get_distance(runtime* self)
@@ -242,6 +246,23 @@ struct runtime::tbl
             auto key   = stack.alloc(self->type(vtype), "key");
             auto value = stack.alloc(anyref(), "value");
             stack.locals();
+            auto o = BinaryenNop(mod);
+
+            if (vtype == value_type::integer)
+            {
+                // TODO check 0xFF00000001
+
+                auto i     = stack.alloc(self->size_type(), "i");
+                auto tee_i = stack.tee(i, self->binop(BinaryenSubInt32(), self->integer_to_size(integer::get<integer::inner>(*self, stack.get(key))), self->const_i32(1)));
+                o          = self->make_if(self->binop(BinaryenLtUInt32(),
+                                              tee_i,
+                                              self->array_len(table::get<table::array>(*self, stack.get(table)))),
+                                  self->make_block(std::array{
+                                      ref_array::set(*self, table::get<table::array>(*self, stack.get(table)), stack.get(i), stack.get(value)),
+                                      self->make_return(),
+                                  }));
+                stack.free_local(i);
+            }
 
             size_t hash_map   = stack.alloc(self->hash_array_type(), "hash_map");
             size_t hash_value = stack.alloc(self->size_type(), "hash_value");
@@ -271,6 +292,7 @@ struct runtime::tbl
             };
 
             auto body = std::array{
+                o,
                 // if (size > capacity * max_load_factor)
                 self->make_if(self->binop(BinaryenGtFloat32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_size), self->binop(BinaryenMulFloat32(), self->unop(BinaryenConvertUInt32ToFloat32(), tee_capacity), BinaryenConst(mod, BinaryenLiteralFloat32(0.8f)))),
                               self->make_block(std::array{
@@ -346,7 +368,10 @@ struct runtime::tbl
                 // TODO check 0xFF00000001
                 auto i     = stack.alloc(self->size_type(), "i");
                 auto tee_i = stack.tee(i, self->binop(BinaryenSubInt32(), self->integer_to_size(integer::get<integer::inner>(*self, stack.get(key))), self->const_i32(1)));
-                o          = self->make_if(self->binop(BinaryenLtUInt32(), tee_i, table::get<table::array_size>(*self, stack.get(table))), self->make_return(ref_array::get(*self, table::get<table::array>(*self, stack.get(table)), stack.get(i))));
+                o          = self->make_if(self->binop(BinaryenLtUInt32(),
+                                              tee_i,
+                                              self->array_len(table::get<table::array>(*self, stack.get(table)))),
+                                  self->make_return(ref_array::get(*self, table::get<table::array>(*self, stack.get(table)), stack.get(i))));
                 stack.free_local(i);
             }
 
@@ -417,7 +442,6 @@ build_return_t runtime::table_create_array()
                 table::create(*this, std::array{
                                          local_get(0, ref_array_type()),
                                          hash_array::create_fixed(*this, std::array{null()}),
-                                         array_len(local_get(0, ref_array_type())),
                                          const_i32(0),
                                          null(),
                                      }),
@@ -430,8 +454,7 @@ build_return_t runtime::table_create_map()
             make_block(std::array{
                 table::create(*this, std::array{
                                          null(),
-                                         hash_array::create(*this, const_i32(1) /*local_get(0, size_type())*/),
-                                         const_i32(0),
+                                         hash_array::create(*this, const_i32(2) /*local_get(0, size_type())*/),
                                          const_i32(0),
                                          null(),
                                      }),
