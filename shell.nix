@@ -1,12 +1,6 @@
 {
   pkgs ? import <nixpkgs> { },
 }:
-let
-  unstable =
-    import
-      (fetchTarball "https://github.com/nixos/nixpkgs/tarball/0868bed2208dbf49976ba910a0c942cac372c47e")
-      { };
-in
 pkgs.mkShell {
   packages =
     with pkgs;
@@ -21,19 +15,19 @@ pkgs.mkShell {
     ++ [
       vcpkg
       pkg-config
+      readline
     ]
     ++ [
       gcc
       gdb
-      unstable.emscripten
+      emscripten
       python3
-      nodejs_23
+      nodejs_24
       lua5_3
       luajit_2_0
     ];
-  shellHook = ''
-    export VCPKG_ROOT=${pkgs.vcpkg}/share/vcpkg
-    export EMSDK=${unstable.emscripten}
-    export EM_CACHE=~/.emscripten_cache
-  '';
+  env = {
+    VCPKG_ROOT = "${pkgs.vcpkg}/share/vcpkg";
+    EMSDK = "${pkgs.emscripten}";
+  };
 }
