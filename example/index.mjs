@@ -1,8 +1,9 @@
-import { newInstance, format } from "../wumbo.mjs";
 import fs from "fs/promises";
 import { argv } from "process";
 
-const arg = argv.slice(2);
+const { newInstance, format } = await import(argv[2]);
+
+const arg = argv.slice(3);
 
 const load = await newInstance({ optimize: true, format: format.none });
 console.time("compile");

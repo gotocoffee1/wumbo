@@ -1,9 +1,10 @@
-import { newInstance } from "../wumbo.mjs";
 import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
 import { argv } from "process";
 import util from "util";
+
+const { newInstance } = await import(argv[2]);
 
 const exec = util.promisify(execFile);
 
