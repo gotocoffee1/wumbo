@@ -31,6 +31,6 @@ pkgs.mkShell {
     CODELLDB_PATH = "${pkgs.vscode-extensions.vadimcn.vscode-lldb}/share/vscode/extensions/vadimcn.vscode-lldb/adapter/codelldb";
     VCPKG_ROOT = "${pkgs.vcpkg}/share/vcpkg";
     EMSDK = "${pkgs.emscripten}";
-    EMSCRIPTEN = "${pkgs.emscripten}/share/emscripten";
+    EMSCRIPTEN_ROOT = "${pkgs.emscripten}/share/emscripten";
   };
 }
