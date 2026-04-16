@@ -174,7 +174,7 @@ struct runtime : ext_types
             std::string name;
             BinaryenType ret_type;
 
-            expr_ref operator()(nonstd::span<const expr_ref> param, bool return_call = false)
+            expr_ref operator()(std::span<const expr_ref> param, bool return_call = false)
             {
                 if (return_call)
                     return BinaryenReturnCall(mod, name.c_str(), const_cast<expr_ref*>(param.data()), param.size(), ret_type);
@@ -241,7 +241,7 @@ struct runtime : ext_types
                          sig.return_type);
     }
 
-    auto call(functions function, nonstd::span<const expr_ref> params)
+    auto call(functions function, std::span<const expr_ref> params)
     {
         auto& sig = require(function);
         return make_call(sig.name,
@@ -249,7 +249,7 @@ struct runtime : ext_types
                          sig.return_type);
     }
 
-    std::tuple<expr_ref_list, std::vector<size_t>> unpack_locals(function_stack& stack, nonstd::span<const char* const> p, expr_ref list)
+    std::tuple<expr_ref_list, std::vector<size_t>> unpack_locals(function_stack& stack, std::span<const char* const> p, expr_ref list)
     {
         std::string none               = "+none" + std::to_string(stack.unique_num());
         std::vector<const char*> names = {none.c_str()};
@@ -333,7 +333,7 @@ struct runtime : ext_types
         return {result, vars};
     }
 
-    expr_ref make_ref_array(function_stack& stack, nonstd::span<const expr_ref> p)
+    expr_ref make_ref_array(function_stack& stack, std::span<const expr_ref> p)
     {
         if (p.empty())
             return null();

@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
-#include <nonstd/span.hpp>
+#include <span>
 #include <utility>
 #include <vector>
 
@@ -274,7 +274,7 @@ struct compiler : ext_types
         semantic_error("cannot use '...' outside a vararg function near '...'");
     }
 
-    expr_ref_list unpack_locals(const name_list& p, expr_ref list, nonstd::span<const local_usage> usage, bool is_vararg = false)
+    expr_ref_list unpack_locals(const name_list& p, expr_ref list, std::span<const local_usage> usage, bool is_vararg = false)
     {
 
         auto& func = _func_stack.current_function();
@@ -386,7 +386,7 @@ struct compiler : ext_types
     }
 
     template<typename F>
-    auto add_func(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
+    auto add_func(const char* name, const name_list& p, std::span<const local_usage> usage, bool vararg, F&& f)
     {
         function_frame frame{_func_stack, func_arg_count};
 
@@ -433,7 +433,7 @@ struct compiler : ext_types
     }
 
     template<typename F>
-    auto get_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
+    auto get_func_ref(const char* name, const name_list& p, std::span<const local_usage> usage, bool vararg, F&& f)
     {
         auto [func, req_ups] = add_func(name, p, usage, vararg, f);
 
@@ -444,13 +444,13 @@ struct compiler : ext_types
     }
 
     template<typename F>
-    auto add_func_ref(const char* name, const name_list& p, nonstd::span<const local_usage> usage, bool vararg, F&& f)
+    auto add_func_ref(const char* name, const name_list& p, std::span<const local_usage> usage, bool vararg, F&& f)
     {
         auto [ref, ups] = get_func_ref(name, p, usage, vararg, std::forward<F>(f));
         return build_closure(ref, std::move(ups));
     }
 
-    auto add_func_ref(const char* name, const block& inner, const name_list& p, nonstd::span<const local_usage> usage, bool vararg)
+    auto add_func_ref(const char* name, const block& inner, const name_list& p, std::span<const local_usage> usage, bool vararg)
     {
         return add_func_ref(
             name, p, usage, vararg, [&]()

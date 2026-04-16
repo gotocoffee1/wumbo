@@ -11,8 +11,6 @@ project(
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
 
-
-
 add_library(wumbo
   "source/frontend/parser.cpp"
   "source/lua2wasm.cpp"
@@ -40,7 +38,6 @@ add_library(wumbo
 add_library(wumbo::wumbo ALIAS wumbo)
 
 find_package(pegtl CONFIG REQUIRED)
-find_package(span-lite CONFIG REQUIRED)
 if (NOT EMSCRIPTEN)
   find_package(CLI11 CONFIG REQUIRED)
 endif()
@@ -64,7 +61,7 @@ include(FetchContent)
 FetchContent_Declare(
   binaryen 
   GIT_REPOSITORY https://github.com/WebAssembly/binaryen
-  GIT_TAG 9b161a9bf93c26feb05c727a838444c42398ba78
+  GIT_TAG d0e2be9edd0052e487dde1d8d85d10f1338af584
   EXCLUDE_FROM_ALL
 )
 
@@ -75,11 +72,10 @@ FetchContent_MakeAvailable(binaryen)
 set(CMAKE_CXX_FLAGS ${temp})
 set(CMAKE_C_FLAGS ${temp2})
 
-target_compile_features(wumbo PUBLIC cxx_std_17)
+target_compile_features(wumbo PUBLIC cxx_std_20)
 
 target_link_libraries(wumbo
   PRIVATE
-  nonstd::span-lite
   taocpp::pegtl
   binaryen)
 

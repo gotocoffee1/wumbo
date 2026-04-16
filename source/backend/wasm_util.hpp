@@ -9,7 +9,7 @@
 #include <variant>
 #include <vector>
 
-#include "nonstd/span.hpp"
+#include <span>
 #include "utils/util.hpp"
 
 namespace wumbo
@@ -152,14 +152,14 @@ struct utils
         return BinaryenArrayGet(mod, array, index, type, is_signed);
     }
 
-    expr_ref make_block(nonstd::span<const expr_ref> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
+    expr_ref make_block(std::span<const expr_ref> list, const char* name = nullptr, BinaryenType btype = BinaryenTypeAuto())
     {
         if (list.size() == 1 && name == nullptr)
             return list[0];
         return BinaryenBlock(mod, name, const_cast<expr_ref*>(list.data()), list.size(), btype);
     }
 
-    expr_ref make_call(const char* target, nonstd::span<const expr_ref> args, BinaryenType btype)
+    expr_ref make_call(const char* target, std::span<const expr_ref> args, BinaryenType btype)
     {
         return BinaryenCall(mod, target, const_cast<expr_ref*>(args.data()), args.size(), btype);
     }
@@ -431,7 +431,7 @@ struct ext_types : utils
     std::size_t label_counter = 0;
 
     template<typename F>
-    auto switch_value(expr_ref exp, nonstd::span<const value_type> casts, F&& code)
+    auto switch_value(expr_ref exp, std::span<const value_type> casts, F&& code)
     {
         auto n       = "nil" + std::to_string(label_counter++);
         auto counter = label_counter;
@@ -594,7 +594,7 @@ struct ext_types : utils
     template<typename Self, bool IsNullable = false>
     struct struct_desc : type_desc<IsNullable>
     {
-        static expr_ref create(ext_types& self, nonstd::span<const expr_ref> values)
+        static expr_ref create(ext_types& self, std::span<const expr_ref> values)
         {
             return BinaryenStructNew(self.mod, const_cast<expr_ref*>(values.data()), values.size(), BinaryenTypeGetHeapType(self.get_type<Self>()));
         }
@@ -619,7 +619,7 @@ struct ext_types : utils
         {
             return BinaryenArrayNew(self.mod, BinaryenTypeGetHeapType(self.get_type<Self>()), size, init);
         }
-        static expr_ref create_fixed(ext_types& self, nonstd::span<const expr_ref> values)
+        static expr_ref create_fixed(ext_types& self, std::span<const expr_ref> values)
         {
             return BinaryenArrayNewFixed(self.mod, BinaryenTypeGetHeapType(self.get_type<Self>()), const_cast<expr_ref*>(values.data()), values.size());
         }

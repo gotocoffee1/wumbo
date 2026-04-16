@@ -4,7 +4,6 @@
   "license": "MIT",
   "dependencies": [
     "pegtl",
-    "span-lite",
     {
       "name": "cli11",
       "platform": "!emscripten"

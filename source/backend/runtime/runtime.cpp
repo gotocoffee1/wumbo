@@ -449,7 +449,7 @@ build_return_t runtime::invoke()
 
                                             real_args[upvalue_index] = upvalues;
                                             real_args[args_index]    = local_get(1, ref_array_type());
-                                            return BinaryenCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone(), true);
+                                            return BinaryenReturnCallRef(mod, func_ref, std::data(real_args), std::size(real_args), BinaryenTypeNone());
                                         }
 
                                         default:
