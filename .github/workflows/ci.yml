@@ -24,4 +24,4 @@ jobs:
         uses: lukka/run-cmake@v10
         with:
           configurePreset: 'wasm32-emscripten-clang'
-          buildPreset: 'wasm32-emscripten-clang-release'
+          buildPreset: 'wasm32-emscripten-clang-Release'

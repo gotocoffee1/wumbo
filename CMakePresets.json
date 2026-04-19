@@ -47,25 +47,25 @@
   ],
   "buildPresets": [
     {
-      "name": "x64-linux-gcc-debug",
+      "name": "x64-linux-gcc-Debug",
       "configurePreset": "x64-linux-gcc",
       "configuration": "Debug",
       "jobs": 12
     },
     {
-      "name": "wasm32-emscripten-clang-debug",
+      "name": "wasm32-emscripten-clang-Debug",
       "configurePreset": "wasm32-emscripten-clang",
       "configuration": "Debug",
       "jobs": 12
     },
     {
-      "name": "x64-linux-gcc-release",
+      "name": "x64-linux-gcc-Release",
       "configurePreset": "x64-linux-gcc",
       "configuration": "Release",
       "jobs": 12
     },
     {
-      "name": "wasm32-emscripten-clang-release",
+      "name": "wasm32-emscripten-clang-Release",
       "configurePreset": "wasm32-emscripten-clang",
       "configuration": "Release",
       "jobs": 12
@@ -73,9 +73,16 @@
   ],
   "testPresets": [
     {
-      "name": "wasm32-emscripten-clang-release",
+      "name": "wasm32-emscripten-clang-Debug",
       "configurePreset": "wasm32-emscripten-clang",
-      "configuration": "Release"
+      "configuration": "Debug",
+      "output": {"outputOnFailure": true}
+    },
+    {
+      "name": "wasm32-emscripten-clang-Release",
+      "configurePreset": "wasm32-emscripten-clang",
+      "configuration": "Release",
+      "output": {"outputOnFailure": true}
     }
   ]
 }

@@ -1,6 +1,0 @@
-#!/bin/sh
-
-script_dir=$(realpath $(dirname $0))
-WUMBO_PATH="$script_dir/../build/wasm32-emscripten-clang/Debug/wumbo.mjs"
-node --experimental-wasm-jspi "$script_dir/index.mjs" "$WUMBO_PATH" "$@"
-
