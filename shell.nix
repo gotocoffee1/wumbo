@@ -24,6 +24,7 @@ pkgs.mkShell {
       nodejs_24
       lua5_3
       luajit_2_0
+      just
     ];
   env = {
     VCPKG_ROOT = "${pkgs.vcpkg}/share/vcpkg";

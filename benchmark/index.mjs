@@ -103,7 +103,7 @@ const [luaVersion, luajitVersion] = await Promise.all([
 ]);
 
 await fs.writeFile(
-  "result.json",
+  "bench_result.json",
   JSON.stringify({
     version: process.version,
     v8: process.versions.v8,
