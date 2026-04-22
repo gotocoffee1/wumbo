@@ -1,10 +1,10 @@
 import fs from "fs/promises";
 import path from "path";
 import { execFile } from "child_process";
-import { argv } from "process";
+import { argv, env } from "process";
 import util from "util";
 
-const { newInstance } = await import(argv[2]);
+const { newInstance } = await import(env.WUMBO_PATH);
 
 const exec = util.promisify(execFile);
 

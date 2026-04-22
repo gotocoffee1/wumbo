@@ -1,8 +1,8 @@
-#${CMAKE_CURRENT_SOURCE_DIR}!/bin/sh
+#!/bin/sh
 
 script_dir=$(realpath $(dirname $0))
 : "${WUMBO_PATH:="$script_dir/build/wasm32-emscripten-clang/Release/wumbo.mjs"}"
 export WUMBO_PATH
 : "${WUMBO_INIT_PATH="$script_dir/index.mjs"}"
-node --experimental-wasm-jspi "$WUMBO_INIT_PATH" "$WUMBO_PATH" "$@"
+node --experimental-wasm-jspi "$WUMBO_INIT_PATH" "$@"
 

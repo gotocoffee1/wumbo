@@ -5,7 +5,7 @@
     <title>Benchmark Bar Graph</title>
     <script type="text/javascript" src="https://www.gstatic.com/charts/loader.js"></script>
     <script type="module">
-        import benchmark from "./result.json" with { type: 'json' };
+        import benchmark from "./bench_result.json" with { type: 'json' };
 
         google.charts.load('current', { packages: ['corechart', 'bar'] });
         google.charts.setOnLoadCallback(drawChart);
@@ -62,7 +62,7 @@
     </script>
 </head>
 
-<body>
+<body style="background-color:white;">
     <h2>Lua Benchmark Bar Graph</h2>
     <div id="bargraph" style="width: 100%; height: 400px;"></div>
 </body>

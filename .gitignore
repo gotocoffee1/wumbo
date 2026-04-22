@@ -12,5 +12,4 @@ archive/
 .cache/
 node_modules/
 compile_commands.json
-/*.mjs
 /*.wasm
