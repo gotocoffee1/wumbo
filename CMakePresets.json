@@ -84,5 +84,23 @@
       "configuration": "Release",
       "output": {"outputOnFailure": true}
     }
+  ],
+  "packagePresets": [
+    {
+      "name": "wasm32-emscripten-clang-Debug",
+      "configurePreset": "wasm32-emscripten-clang",
+      "configurations": ["Debug"],
+      "generators": [
+        "ZIP"
+      ]
+    },
+    {
+      "name": "wasm32-emscripten-clang-Release",
+      "configurePreset": "wasm32-emscripten-clang",
+      "configurations": ["Release"],
+      "generators": [
+        "ZIP"
+      ]
+    }
   ]
 }

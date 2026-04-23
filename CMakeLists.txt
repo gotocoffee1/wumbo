@@ -118,14 +118,19 @@ set_target_properties(
 
 add_subdirectory(benchmark)
 
-# ---- Install rules ----
-if(NOT CMAKE_SKIP_INSTALL_RULES)
-  #include(cmake/install-rules.cmake)
-endif()
-
 include(CTest)
 
 if(BUILD_TESTING)
   add_subdirectory(test)
 endif()
+
+# ---- Install rules ----
+if(NOT CMAKE_SKIP_INSTALL_RULES)
+  install(TARGETS wumbo_exe DESTINATION bin)
+  if(EMSCRIPTEN)
+    install(FILES "$<TARGET_FILE_DIR:wumbo_exe>/wumbo.wasm" DESTINATION bin)
+  endif()
+endif()
+
+include(CPack)
 

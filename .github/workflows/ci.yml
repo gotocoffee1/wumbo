@@ -7,7 +7,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Setup CMake
-        uses: lukka/get-cmake@v4.1.2
+        uses: lukka/get-cmake@v4.3.2
+        with:
+          cmakeVersion: 4.1.2
+          ninjaVersion: 1.13.2 
       - name: Setup CCache
         uses: hendrikmuhs/ccache-action@v1.2.22
         with:
@@ -25,3 +28,10 @@ jobs:
         with:
           configurePreset: 'wasm32-emscripten-clang'
           buildPreset: 'wasm32-emscripten-clang-Release'
+          packagePreset: 'wasm32-emscripten-clang-Release'
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          path: 'build/wasm32-emscripten-clang/*.zip'
+          archive: false
+

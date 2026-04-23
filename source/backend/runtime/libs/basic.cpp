@@ -38,7 +38,20 @@ build_return_t runtime::open_basic_lib()
     std("getmetatable", std::array{"object"}, [this](function_stack& stack, auto&& vars)
         {
             auto [object] = vars;
-            return make_ref_array(stack, std::array{table::get<table::metatable>(*this, stack.get(object))});
+            auto casts    = std::array{
+                value_type::table,
+            };
+
+            return switch_value(stack.get(object), casts, [&](value_type type, expr_ref exp)
+                                {
+                                    switch (type)
+                                    {
+                                    case value_type::table:
+                                        return make_return(make_ref_array(stack, std::array{table::get<table::metatable>(*this, exp)}));
+                                    default:
+                                        return BinaryenUnreachable(mod);
+                                    }
+                                });
         });
     std("ipairs", std::array{"t"}, [this](function_stack& stack, auto&& vars)
         {
@@ -169,10 +182,23 @@ build_return_t runtime::open_basic_lib()
     std("setmetatable", std::array{"table", "metatable"}, [this](function_stack& stack, auto&& vars)
         {
             auto [table, metatable] = vars;
-            return std::array{
-                table::set<table::metatable>(*this, stack.get(table), stack.get(metatable)),
-                make_ref_array(stack, std::array{stack.get(table)}),
+            auto casts              = std::array{
+                value_type::table,
             };
+            auto m = BinaryenRefCast(mod, stack.get(metatable), type<value_type::table>());
+            return switch_value(stack.get(table), casts, [&](value_type type, expr_ref exp)
+                                {
+                                    switch (type)
+                                    {
+                                    case value_type::table:
+                                        return make_block(std::array{
+                                            table::set<table::metatable>(*this, exp, m),
+                                            make_return(make_ref_array(stack, std::array{stack.get(table)})),
+                                        });
+                                    default:
+                                        return BinaryenUnreachable(mod);
+                                    }
+                                });
         });
     std("tonumber", std::array{"e", "base"}, [this](function_stack& stack, auto&& vars)
         {
