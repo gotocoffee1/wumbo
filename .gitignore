@@ -2,6 +2,7 @@
 .vs/
 .vscode/
 build/
+install/
 cmake-build-*/
 prefix/
 **/.DS_Store

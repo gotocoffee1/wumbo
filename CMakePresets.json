@@ -5,6 +5,7 @@
     "minor": 28
   },
   "include": [
+    "presets/common.json",
     "presets/flags.json",
     "presets/platforms.json",
     "presets/tools.json"
@@ -13,12 +14,12 @@
     {
       "name": "common",
       "generator": "Ninja Multi-Config",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "hidden": true,
       "inherits": [
         "std",
         "vcpkg",
-        "ccache"
+        "ccache",
+        "shared-bin-dir"
       ]
     },
     {
