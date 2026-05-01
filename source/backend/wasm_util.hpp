@@ -9,8 +9,8 @@
 #include <variant>
 #include <vector>
 
-#include <span>
 #include "utils/util.hpp"
+#include <span>
 
 namespace wumbo
 {
@@ -215,8 +215,6 @@ struct ext_types : utils
     static constexpr size_t lua_type_offset = 5;
 
     //std::array<BinaryenType, type_count> types;
-
-    const char* error_tag = "error";
 
     template<value_type T>
     BinaryenType type() const
@@ -980,9 +978,9 @@ struct ext_types : utils
                 | BinaryenFeatureReferenceTypes());
 
         types = types_::build(*this);
-        BinaryenAddTag(mod, error_tag, anyref(), BinaryenTypeNone());
-        BinaryenAddTagExport(mod, error_tag, error_tag);
     }
+
+    const char* error_tag = "error";
 
     expr_ref throw_error(expr_ref error)
     {

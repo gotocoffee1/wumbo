@@ -276,8 +276,7 @@ struct compiler : ext_types
 
     expr_ref_list unpack_locals(const name_list& p, expr_ref list, std::span<const local_usage> usage, bool is_vararg = false)
     {
-
-        auto& func = _func_stack.current_function();
+        auto& func                     = _func_stack.current_function();
         std::vector<std::string> names = {func.make_label("+none")};
         std::vector<size_t> vars;
 
@@ -492,10 +491,8 @@ struct compiler : ext_types
 
     expr_ref operator()(const un_operation& p);
 
-    auto operator()(const block& p) -> expr_ref_list
+    expr_ref_list unscoped_block(const block& p)
     {
-        block_scope block{_func_stack};
-
         expr_ref_list result;
         for (auto& statement : p.statements)
         {
@@ -509,6 +506,12 @@ struct compiler : ext_types
         }
 
         return result;
+    }
+
+    expr_ref_list operator()(const block& p)
+    {
+        block_scope block{_func_stack};
+        return unscoped_block(p);
     }
 
     expr_ref_list setup_env()
@@ -570,6 +573,8 @@ struct compiler : ext_types
                             std::data(locals),
                             std::size(locals),
                             make_block(env));
+        //consider moving all export to the runtime
+        BinaryenAddTagExport(mod, error_tag, error_tag);
 
         BinaryenAddFunctionExport(mod, "*init_env", "init_env");
     }

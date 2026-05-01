@@ -52,6 +52,7 @@ using expression_list = std::vector<expression>;
 struct statement;
 
 using return_stat = std::optional<expression_list>;
+
 struct block
 {
     return_stat retstat;               // size >=0

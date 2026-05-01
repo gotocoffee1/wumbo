@@ -1,9 +1,9 @@
 #include "ast/ast.hpp"
+#include "backend/wasm_util.hpp"
 #include "compiler.hpp"
 
 namespace wumbo
 {
-
 static std::string loop_end(function_info& func)
 {
     return func.loop_stack.back() + "_end";
@@ -53,12 +53,13 @@ expr_ref_list compiler::operator()(const repeat_statement& p)
     auto& func = _func_stack.current_function();
     loop_scope scope{func};
 
-    auto cond = (*this)(p.condition);
-
     auto begin = loop_begin(func);
     auto end   = loop_end(func);
 
-    auto body = (*this)(p.inner);
+    block_scope block{_func_stack};
+    auto body = unscoped_block(p.inner);
+    auto cond = (*this)(p.condition);
+
     body.push_back(BinaryenBreak(mod, begin.c_str(), _runtime.call(functions::to_bool_not, cond), nullptr));
     return {BinaryenLoop(mod, begin.c_str(), make_block(body, end.c_str()))};
 }
@@ -112,15 +113,15 @@ expr_ref_list compiler::operator()(const for_each& p)
     // https://www.lua.org/manual/5.3/manual.html#3.3.5
 
     block_scope block{_func_stack};
-    
+
     local_variables vars_help;
     vars_help.explist = p.explist;
     vars_help.names   = {"*f", "*s", "*var"};
     vars_help.usage.resize(3);
     for (auto& usage : vars_help.usage)
-    usage.read_count = 1;
+        usage.read_count = 1;
     expr_ref_list result = {(*this)(vars_help)};
-    
+
     auto& func = _func_stack.current_function();
     loop_scope scope{func};
 

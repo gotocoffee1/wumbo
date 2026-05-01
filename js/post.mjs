@@ -6,23 +6,27 @@ const instantiateBuffer = async (buffer, importObject) => {
   return instance.exports;
 };
 
-const makeImportObject = (override, load_func) => {
-  const bufToStr = (buf) => new TextDecoder().decode(buf);
-  const strToBuf = (str) => new TextEncoder().encode(str);
+const bufToStr = (buf) => new TextDecoder().decode(buf);
+const strToBuf = (str) => new TextEncoder().encode(str);
 
+const makeImportObject = (override, load_func) => {
   const writer = (println) => {
-    let buffer =  new Uint8Array(0);
+    let buffer = new Uint8Array(0);
     return (s) => {
-      buffer = new Uint8Array([ ...buffer, ...s]);
-      for (let i; -1 !== (i = buffer.indexOf(0xa)); buffer = buffer.slice(i + 1))
+      buffer = new Uint8Array([...buffer, ...s]);
+      for (
+        let i;
+        -1 !== (i = buffer.indexOf(0xa));
+        buffer = buffer.slice(i + 1)
+      )
         println(bufToStr(buffer.slice(0, i)));
-    }
+    };
   };
   const importObject = {
     load: {
       load: WebAssembly.Suspending
         ? new WebAssembly.Suspending(load_func)
-        : () => { },
+        : () => {},
     },
     native: {
       stdout: writer(console.log),
@@ -95,10 +99,19 @@ const load = async (bytes, importObject, optimize, format, standalone) => {
   return [exports, wat];
 };
 
+export class LuaError extends Error {
+  constructor(obj) {
+    if (obj instanceof Uint8Array) super(bufToStr(obj));
+    else super(String(obj));
+    this.name = "LuaError";
+    this.errObj = obj;
+  }
+}
+
 export const format = {
-    none: undefined,
-    function: 0,
-    stack: 1,
+  none: undefined,
+  function: 0,
+  stack: 1,
 };
 
 export const newInstance = async ({
@@ -126,9 +139,9 @@ export const newInstance = async ({
     const func = WebAssembly.promising
       ? WebAssembly.promising(exports.init_env)
       : (...args) =>
-        new Promise((resolve) => {
-          resolve(exports.init_env(...args));
-        });
+          new Promise((resolve) => {
+            resolve(exports.init_env(...args));
+          });
 
     const jsToLua = (obj) => {
       switch (typeof obj) {
@@ -191,7 +204,7 @@ export const newInstance = async ({
       } catch (e) {
         if (e instanceof WebAssembly.Exception) {
           if (e.is(exports.error))
-            throw new Error(luaToJs(e.getArg(exports.error, 0)));
+            throw new LuaError(luaToJs(e.getArg(exports.error, 0)));
         }
         throw e;
       }

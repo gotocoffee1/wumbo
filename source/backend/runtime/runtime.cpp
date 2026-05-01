@@ -30,6 +30,12 @@ void runtime::build_types()
 
 void runtime::build()
 {
+    if (create_functions != function_action::none)
+        BinaryenAddTag(mod, error_tag, anyref(), BinaryenTypeNone());
+    if (export_functions != function_action::none)
+        BinaryenAddTagExport(mod, error_tag, error_tag);
+    if (import_functions != function_action::none)
+        BinaryenAddTagImport(mod, error_tag, "runtime", error_tag, anyref(), BinaryenTypeNone());
     for (size_t i = 0; i < std::size(_funcs); ++i)
     {
         auto& f = _funcs[i];
