@@ -79,13 +79,44 @@ expr_ref_list compiler::operator()(const for_statement& p)
         usage.read_count = 1;
 
     expr_ref_list result = {(*this)(vars_help)};
-
+    // improve this mess
+    // while (*step > 0 and *limit >= *var) or (step <= 0 and *limit <= *var) do
+    //     -- loop body
+    //     *var = *var + *step
+    // end
+    bin_operation test_step;
+    test_step.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*step");
+    test_step.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<int_type>(0);
+    test_step.op = bin_operator::greater_than;
     bin_operation cmp;
     cmp.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*limit");
     cmp.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
     cmp.op = bin_operator::greater_or_equal;
+    bin_operation up;
+    up.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<box<bin_operation>>(std::move(test_step));
+    up.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<box<bin_operation>>(std::move(cmp));
+    up.op = bin_operator::logic_and;
+
+    bin_operation not_test_step;
+    not_test_step.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*step");
+    not_test_step.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<int_type>(0);
+    not_test_step.op = bin_operator::less_or_equal;
+    bin_operation cmp2;
+    cmp2.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*limit");
+    cmp2.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<name_t>("*var");
+    cmp2.op = bin_operator::less_or_equal;
+    bin_operation down;
+    down.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<box<bin_operation>>(std::move(not_test_step));
+    down.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<box<bin_operation>>(std::move(cmp2));
+    down.op = bin_operator::logic_and;
+
+    bin_operation o;
+    o.lhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<box<bin_operation>>(std::move(up));
+    o.rhs.inner.emplace<box<prefixexp>>()->chead.emplace<expression>().inner.emplace<box<bin_operation>>(std::move(down));
+    o.op = bin_operator::logic_or;
+
     while_statement w;
-    w.condition.inner.emplace<box<bin_operation>>(std::move(cmp));
+    w.condition.inner.emplace<box<bin_operation>>(std::move(o));
     local_variables counter;
     counter.names = {p.var};
     counter.usage = {p.usage};

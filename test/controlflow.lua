@@ -85,14 +85,8 @@ end
 -- 5 4 3 2 1
 
 -- Numeric for: float step
-local fvals = {}
-local fi = 1
 for n = 0.0, 1.0, 0.25 do
-	fvals[fi] = n
-	fi = fi + 1
-end
-for i = 1, #fvals do
-	print(fvals[i])
+	print(n)
 end
 -- 0.0  0.25  0.5  0.75  1.0
 
