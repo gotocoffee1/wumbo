@@ -8,9 +8,6 @@ project(
   LANGUAGES C CXX
 )
 
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/${CONFIG})
-
 add_library(wumbo
   "source/frontend/parser.cpp"
   "source/lua2wasm.cpp"
@@ -117,6 +114,10 @@ set_target_properties(
   OUTPUT_NAME wumbo)
 
 add_subdirectory(benchmark)
+
+add_custom_target(example COMMAND ${CMAKE_COMMAND} -E env WUMBO_PATH="$<TARGET_FILE:wumbo_exe>" ${CMAKE_CURRENT_SOURCE_DIR}/wumbo ${CMAKE_CURRENT_SOURCE_DIR}/example/init.lua)
+
+add_dependencies(example wumbo_exe)
 
 include(CTest)
 

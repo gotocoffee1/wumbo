@@ -113,6 +113,11 @@ struct function_stack
         upvalues.pop_back();
     }
 
+    const function_info& current_function() const
+    {
+        return functions.back();
+    }
+
     function_info& current_function()
     {
         return functions.back();
@@ -121,28 +126,27 @@ struct function_stack
     local_index_t local_offset(global_index_t index) const
     {
         assert(is_index_local(index) && "invalid index");
-        auto& func = functions.back();
+        auto& func = current_function();
         return func.arg_count + (index - func.offset);
     }
 
     bool is_index_local(global_index_t index) const
     {
-        auto func_offset = functions.back().offset;
+        auto func_offset = current_function().offset;
         return index >= func_offset;
     }
 
     void free_local(size_t pos)
     {
-        auto& func = functions.back();
+        auto& func = current_function();
 
         vars[(pos - func.arg_count) + func.offset].flags &= ~local_var::is_used;
     }
 
     local_index_t alloc_local(BinaryenType type, std::string_view name = "", bool helper = true)
     {
-        auto func_offset = functions.back().offset;
-
-        for (size_t i = func_offset; i < vars.size(); ++i)
+        auto func_offset = current_function().offset;
+        for (size_t i = (blocks.empty() ? func_offset : std::max(func_offset, blocks.back())); i < vars.size(); ++i)
         {
             auto& var = vars[i];
             if (type == var.type && !(var.flags & local_var::is_used))

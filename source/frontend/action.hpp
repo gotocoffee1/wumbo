@@ -48,17 +48,8 @@ struct parse_num
     {
         auto sv = in.string_view();
         sv.remove_prefix(Prefix);
-#ifdef __clang__
-        if constexpr (std::is_integral_v<decltype(ParseMode)>)
-#else
-        if constexpr (true)
-#endif //  __clang__
-        {
-            auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), num, ParseMode);
-            return ec == std::errc{};
-        }
-        else
-            return true;
+        auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), num, ParseMode);
+        return ec == std::errc{};
     }
 };
 // clang-format off

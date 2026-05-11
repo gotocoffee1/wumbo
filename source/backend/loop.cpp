@@ -76,8 +76,10 @@ expr_ref_list compiler::operator()(const for_statement& p)
     vars_help.names = {"*var", "*limit", "*step"};
     vars_help.usage.resize(3);
     for (auto& usage : vars_help.usage)
+    {
         usage.read_count = 1;
-
+        usage.write_count = 1;
+    }
     expr_ref_list result = {(*this)(vars_help)};
     // improve this mess
     // while (*step > 0 and *limit >= *var) or (step <= 0 and *limit <= *var) do
