@@ -11,7 +11,7 @@ const exec = util.promisify(execFile);
 const bufToStr = (buf) => new TextDecoder().decode(buf);
 const strToBuf = (str) => new TextEncoder().encode(str);
 let buffer = new Uint8Array();
-const load = await newInstance({
+const [load] = await newInstance({
   optimize: true,
   override: {
     native: {

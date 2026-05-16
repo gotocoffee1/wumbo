@@ -33,7 +33,9 @@ const makeImportObject = (override, load_func) => {
       stderr: writer(console.error),
       toNum: (str) => Number(bufToStr(str)),
       toInt: (str) => BigInt(Number(bufToStr(str))),
-      toString: (num) => strToBuf(num.toString()),
+      toStringInt: (num) => strToBuf(num.toString()),
+      toStringNum: (num) =>
+        strToBuf(Number.isInteger(num) ? num.toFixed(1) : num.toString()),
       pow: (base, exponent) => Math.pow(base, exponent),
     },
     buffer: {
@@ -127,88 +129,93 @@ export const newInstance = async ({
     override,
     async (bytes) => (await load_func(bytes))[0].init,
   );
+  let runtimeWat;
   if (!standalone) {
     const [exports, wat] = await runtime(optimize, format, importObject);
+    runtimeWat = wat;
     importObject.runtime = exports;
   }
 
-  return async (txt) => {
-    const bytes = new TextEncoder().encode(txt);
-    const [exports, wat] = await load_func(bytes);
+  return [
+    async (txt) => {
+      const bytes = new TextEncoder().encode(txt);
+      const [exports, wat] = await load_func(bytes);
 
-    const func = WebAssembly.promising
-      ? WebAssembly.promising(exports.init_env)
-      : (...args) =>
-          new Promise((resolve) => {
-            resolve(exports.init_env(...args));
-          });
+      const func = WebAssembly.promising
+        ? WebAssembly.promising(exports.init_env)
+        : (...args) =>
+            new Promise((resolve) => {
+              resolve(exports.init_env(...args));
+            });
 
-    const jsToLua = (obj) => {
-      switch (typeof obj) {
-        case "string":
-          break;
-        case "bigint":
-          return exports.box_integer(obj);
-        case "number":
-          if (Number.isInteger(obj)) {
+      const jsToLua = (obj) => {
+        switch (typeof obj) {
+          case "string":
+            break;
+          case "bigint":
             return exports.box_integer(obj);
-          }
-          return exports.box_number(obj);
-        case "boolean":
-          break;
-        case "object":
-          if (value === null) {
+          case "number":
+            if (Number.isInteger(obj)) {
+              return exports.box_integer(obj);
+            }
+            return exports.box_number(obj);
+          case "boolean":
+            break;
+          case "object":
+            if (value === null) {
+              return null;
+            } else if (Array.isArray(value)) {
+            } else {
+            }
+            break;
+          case "function":
+            break;
+          case "undefined":
+          default:
             return null;
-          } else if (Array.isArray(value)) {
-          } else {
-          }
-          break;
-        case "function":
-          break;
-        case "undefined":
-        default:
-          return null;
-      }
-    };
+        }
+      };
 
-    const luaToJs = (obj) => {
-      switch (exports.get_type_num(obj)) {
-        case 2:
-          return exports.to_js_integer(obj);
-        case 4:
-          return exports.to_js_string(obj);
-        default:
-          return null;
-      }
-    };
+      const luaToJs = (obj) => {
+        switch (exports.get_type_num(obj)) {
+          case 2:
+            return exports.to_js_integer(obj);
+          case 4:
+            return exports.to_js_string(obj);
+          default:
+            return null;
+        }
+      };
 
-    const result = async (...jsArgs) => {
-      try {
-        let args = null;
-        if (jsArgs.length > 0) {
-          args = exports.any_array_create(jsArgs.length);
-          for (let i = 0; i < jsArgs.length; ++i) {
-            exports.any_array_set(args, i, jsToLua(jsArgs[i]));
+      const result = async (...jsArgs) => {
+        try {
+          let args = null;
+          if (jsArgs.length > 0) {
+            args = exports.any_array_create(jsArgs.length);
+            for (let i = 0; i < jsArgs.length; ++i) {
+              exports.any_array_set(args, i, jsToLua(jsArgs[i]));
+            }
           }
+          const ret = await func(args);
+          if (!ret) return;
+          const size = exports.any_array_size(ret);
+          if (size === 0) return;
+          if (size === 1) return luaToJs(exports.any_array_get(ret, 0));
+          const jsResult = new Array(size);
+          for (let i = 0; i < size; ++i) {
+            jsResult[i] = luaToJs(exports.any_array_get(ret, i));
+          }
+          return jsResult;
+        } catch (e) {
+          if (e instanceof WebAssembly.Exception) {
+            if (e.is(exports.error))
+              throw new LuaError(luaToJs(e.getArg(exports.error, 0)));
+          }
+          throw e;
         }
-        const ret = await func(args);
-        if (!ret) return;
-        const size = exports.any_array_size(ret);
-        if (size === 0) return;
-        if (size === 1) return luaToJs(exports.any_array_get(ret, 0));
-        const jsResult = new Array(size);
-        for (let i = 0; i < size; ++i) {
-          jsResult[i] = luaToJs(exports.any_array_get(ret, i));
-        }
-        return jsResult;
-      } catch (e) {
-        if (e instanceof WebAssembly.Exception) {
-          if (e.is(exports.error))
-            throw new LuaError(luaToJs(e.getArg(exports.error, 0)));
-        }
-        throw e;
-      }
-    };
-    return [result, wat];
-  };
+      };
+      return [result, wat];
+    },
+    runtimeWat,
+  ];
 };
